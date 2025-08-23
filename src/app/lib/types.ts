@@ -32,3 +32,15 @@ export interface SceneDataForRender extends SceneData {
 
 export type Vector3 = [number, number, number];
 export type Quaternion = [number, number, number, number];
+
+export interface CubeTargetState {
+  position: Vector3;
+  rotate: Quaternion;
+}
+export interface SceneProviderData {
+  targetValues: FaceIndex[];
+}
+
+export type SceneProviderDataUpdate = {
+  [K in keyof SceneProviderData]?: SceneProviderData[K];
+};

@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { Quaternion, SceneProviderData } from "./types";
 
 export const faceVectors = {
   1: new THREE.Vector3(0, 1, 0), //top
@@ -21,3 +22,12 @@ export const cubeMaterialsNumbers = [
 export const cubeSize = 1;
 export const cubeOffset = cubeSize * 2;
 export const cubeDefaultY = 5;
+
+export const defaultCubeRotateQ: Quaternion = [
+  0.3535533905932738, 0.3535533905932738, 0.14644660940672624,
+  0.8535533905932737,
+];
+
+export const initialSceneProviderData: SceneProviderData = {
+  targetValues: [],
+};
