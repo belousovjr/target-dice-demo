@@ -39,8 +39,17 @@ export interface CubeTargetState {
 }
 export interface SceneProviderData {
   targetValues: FaceIndex[];
+  isLoading: boolean;
 }
 
 export type SceneProviderDataUpdate = {
   [K in keyof SceneProviderData]?: SceneProviderData[K];
 };
+
+export interface RollReadyState {
+  velocity: Vector3;
+  angleVelocity: Vector3;
+  rotate: Quaternion;
+}
+
+export type ProviderStage = "CONFIG" | "LOADING";
