@@ -3,6 +3,7 @@ import * as THREE from "three";
 import {
   CubeData,
   CubeDataForRender,
+  Quaternion,
   SceneData,
   SceneDataForRender,
   Vector3,
@@ -171,4 +172,57 @@ export function lookAtCamera(
   lookTarget.lerp(targetCenter, 0.1);
 
   camera.lookAt(lookTarget);
+}
+
+export function moveBodyTowards(
+  posV: Vector3,
+  targetV: Vector3,
+  step = 0.1,
+  minDelta = 0.01
+): { vector: Vector3; isDone: boolean } {
+  const pos = new CANNON.Vec3(...posV);
+  const target = new CANNON.Vec3(...targetV);
+
+  const delta = target.vsub(pos);
+  const dist = delta.length();
+
+  if (dist < minDelta) {
+    return { vector: targetV, isDone: true };
+  }
+
+  const dir = delta.scale(1 / dist);
+  const offset = dir.scale(Math.min(step, dist));
+
+  pos.vadd(offset, pos);
+
+  return {
+    vector: pos.toArray() as Vector3,
+    isDone: false,
+  };
+}
+
+export function rotateBodyTowards(
+  rotateV: Quaternion,
+  targetV: Quaternion,
+  threshold = 0.001,
+  step = 0.05
+): { quant: Quaternion; isDone: boolean } {
+  const rotate = new THREE.Quaternion(...rotateV);
+  const target = new THREE.Quaternion(...targetV);
+  const angle = rotate.angleTo(target);
+
+  if (angle < threshold) {
+    return {
+      quant: targetV,
+      isDone: true,
+    };
+  }
+
+  rotate.slerp(target, step);
+  rotate.normalize();
+
+  return {
+    quant: rotate.toArray(),
+    isDone: false,
+  };
 }
