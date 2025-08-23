@@ -39,7 +39,10 @@ export interface CubeTargetState {
 }
 export interface SceneProviderData {
   targetValues: FaceIndex[];
+  facesData: FaceIndexData[];
   isLoading: boolean;
+  isAnimation: boolean;
+  isFinal: boolean;
 }
 
 export type SceneProviderDataUpdate = {
@@ -52,4 +55,9 @@ export interface RollReadyState {
   rotate: Quaternion;
 }
 
-export type ProviderStage = "CONFIG" | "LOADING";
+export interface FaceRotationData {
+  target: THREE.Quaternion;
+  current: THREE.Quaternion;
+}
+
+export type ProviderStage = "CONFIG" | "LOADING" | "ANIMATION" | "FINAL";

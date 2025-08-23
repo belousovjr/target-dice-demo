@@ -6,7 +6,7 @@ import { FaceIndex } from "../lib/types";
 
 export default function Scene() {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const { provider, targetValues, stage, setTargetValues, start } =
+  const { provider, targetValues, stage, setTargetValues, start, reset } =
     useSceneProvider(canvas);
 
   return (
@@ -22,12 +22,14 @@ export default function Scene() {
               >
                 ADD
               </button>
+              {" | "}
               <button onClick={start}>START</button>
             </>
           )}
+          {stage === "FINAL" && <button onClick={reset}>RESET</button>}{" "}
           {targetValues.map((item, i) => (
             <label key={i}>
-              {i}:
+              {" "}
               <input
                 type="number"
                 value={item}
@@ -58,7 +60,10 @@ export default function Scene() {
         </>
       )}
       <center>
-        <canvas ref={canvas} />
+        <canvas
+          ref={canvas}
+          className="max-w-full max-h-[100dvh] object-contain"
+        />
       </center>
     </div>
   );

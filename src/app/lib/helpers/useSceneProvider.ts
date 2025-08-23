@@ -15,8 +15,14 @@ export default function useSceneProvider(
         new SceneProvider(
           canvas.current,
           [4, 2],
-          ({ isLoading, targetValues }) => {
-            const newStage: ProviderStage = isLoading ? "LOADING" : "CONFIG";
+          ({ isLoading, isAnimation, isFinal, targetValues }) => {
+            const newStage: ProviderStage = isFinal
+              ? "FINAL"
+              : isAnimation
+              ? "ANIMATION"
+              : isLoading
+              ? "LOADING"
+              : "CONFIG";
 
             setStage(newStage);
             setTargetValues(targetValues);
@@ -35,6 +41,9 @@ export default function useSceneProvider(
     },
     start: () => {
       provider?.start();
+    },
+    reset: () => {
+      provider?.reset();
     },
   };
 }

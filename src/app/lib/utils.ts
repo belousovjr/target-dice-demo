@@ -3,6 +3,7 @@ import * as THREE from "three";
 import {
   CubeData,
   CubeDataForRender,
+  FaceIndex,
   Quaternion,
   RollReadyState,
   SceneData,
@@ -14,7 +15,11 @@ import {
   cubeMaterialsNumbers,
   cubeOffset,
   cubeSize,
+  displayHeight,
+  displayWidth,
+  faceVectors,
   loadingRotateStep,
+  restConfirmations,
 } from "./constants";
 
 export function createDiceMaterial(number: number) {
@@ -126,7 +131,12 @@ export function createScene<
   if (scene) {
     scene.background = new THREE.Color(0xaaaaaa);
 
-    const camera = new THREE.PerspectiveCamera(85, 800 / 600, 0.1, 1000);
+    const camera = new THREE.PerspectiveCamera(
+      85,
+      displayWidth / displayHeight,
+      0.1,
+      1000
+    );
     camera.position.set(0, 10, 8);
 
     const renderer = new THREE.WebGLRenderer({
@@ -134,7 +144,7 @@ export function createScene<
       antialias: true,
     });
 
-    renderer.setSize(800, 600);
+    renderer.setSize(displayWidth, displayHeight, false);
 
     const light = new THREE.DirectionalLight(0xffffff, 1);
     light.position.set(5, 10, 7.5);
@@ -142,7 +152,7 @@ export function createScene<
 
     const groundGeo = new THREE.BoxGeometry(100, 1, 100);
     const groundMat = new THREE.MeshStandardMaterial({
-      color: 0x007700,
+      color: 0xff0000,
     });
     const groundMesh = new THREE.Mesh(groundGeo, groundMat);
 
@@ -287,4 +297,55 @@ export function calcLoadingStep(
     quant,
     isStartPosition,
   };
+}
+
+export function compareArrays<T>(a: T[], b: T[]) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+export function getFaceRotationQuant(from: FaceIndex, to: FaceIndex) {
+  const fromVec = faceVectors[from];
+  const toVec = faceVectors[to];
+  return new THREE.Quaternion().setFromUnitVectors(fromVec, toVec).invert();
+}
+
+export function getRestChecker(sceneData: SceneData) {
+  let finalConfirmation = 0;
+  return () => {
+    const sumVelocity = sceneData.cubes.reduce(
+      (res, { body }) =>
+        res + body.velocity.length() + body.angularVelocity.length(),
+      0
+    );
+
+    if (sumVelocity / sceneData.cubes.length < 0.01) {
+      finalConfirmation++;
+      if (finalConfirmation >= restConfirmations) {
+        return true;
+      }
+    } else {
+      finalConfirmation = 0;
+    }
+    return false;
+  };
+}
+
+export function applyRollReadyStates(
+  sceneData: SceneData,
+  states: RollReadyState[]
+) {
+  const { cubes } = sceneData;
+
+  for (let i = 0; i < cubes.length; i++) {
+    const cubeData = cubes[i];
+    const rollReadyState = states[i];
+
+    cubeData.body.quaternion.set(...rollReadyState.rotate);
+    cubeData.body.angularVelocity.set(...rollReadyState.angleVelocity);
+
+    cubeData.body.applyImpulse(
+      new CANNON.Vec3(...rollReadyState.velocity),
+      cubeData.body.position.clone()
+    );
+  }
 }

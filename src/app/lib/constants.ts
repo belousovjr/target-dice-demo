@@ -30,7 +30,17 @@ export const defaultCubeRotateQ: Quaternion = [
 
 export const initialSceneProviderData: SceneProviderData = {
   targetValues: [],
+  facesData: [],
   isLoading: false,
+  isAnimation: false,
+  isFinal: false,
 };
 
-export const loadingRotateStep = Math.PI / 18;
+export const loadingRotateStep = Math.PI / 20;
+
+export const restConfirmations = 50;
+
+export const gravitationValue = -9.82;
+
+export const displayWidth = 2048;
+export const displayHeight = 2048;

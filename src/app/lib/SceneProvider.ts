@@ -2,6 +2,8 @@ import * as THREE from "three";
 import {
   CubeTargetState,
   FaceIndex,
+  FaceIndexData,
+  FaceRotationData,
   Quaternion,
   RollReadyState,
   SceneDataForRender,
@@ -10,11 +12,15 @@ import {
   Vector3,
 } from "./types";
 import {
+  applyRollReadyStates,
   calcCubePosition,
   calcLoadingStep,
+  compareArrays,
   createCube,
   createScene,
   genRollReadyState,
+  getFaceRotationQuant,
+  getRestChecker,
   lookAtCamera,
   moveBodyTowards,
   rotateBodyTowards,
@@ -24,6 +30,7 @@ import {
   cubeDefaultY,
   cubeOffset,
   defaultCubeRotateQ,
+  gravitationValue,
   initialSceneProviderData,
 } from "./constants";
 
@@ -37,6 +44,10 @@ export default class SceneProvider {
   targetStates: CubeTargetState[] = [];
   rollReadyStates: RollReadyState[] = [];
   loadingMeshesStates: THREE.Quaternion[] = [];
+  facesRotationData: FaceRotationData[] = [];
+
+  worker: Worker | undefined;
+  restChecker: (() => boolean) | undefined;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -64,6 +75,7 @@ export default class SceneProvider {
     world.step(1 / 60);
 
     let doneStatesQty = 0;
+    let doneFacesRotQty = 0;
     let isLoadingStart = false;
 
     for (let i = 0; i < cubes.length; i++) {
@@ -71,6 +83,7 @@ export default class SceneProvider {
       const targetState = this.targetStates[i];
       const loadingQuant = this.loadingMeshesStates[i];
       const rollReadyState = this.rollReadyStates[i];
+      const faceRotData = this.facesRotationData[i];
 
       if (targetState) {
         const { vector, isDone: isMoveDone } = moveBodyTowards(
@@ -88,8 +101,6 @@ export default class SceneProvider {
         if (isMoveDone && isRotateDone) {
           doneStatesQty++;
         }
-      } else {
-        doneStatesQty++;
       }
 
       syncMesh(cubeData);
@@ -110,10 +121,39 @@ export default class SceneProvider {
           );
         }
       }
+      if ((this.data.isLoading || this.data.isAnimation) && faceRotData) {
+        const { quant, isDone } = rotateBodyTowards(
+          faceRotData.current.toArray(),
+          faceRotData.target.toArray()
+        );
+        if (isDone) {
+          doneFacesRotQty++;
+        }
+        faceRotData.current = new THREE.Quaternion(...quant);
+
+        cubeData.mesh.quaternion.multiply(faceRotData.current);
+      }
     }
 
-    if (doneStatesQty === this.targetStates.length) {
+    if (
+      this.targetStates.length &&
+      doneStatesQty === this.targetStates.length
+    ) {
       this.targetStates = [];
+    }
+
+    if (this.data.isLoading) {
+      const isFacesTargetPos =
+        this.facesRotationData.length &&
+        doneFacesRotQty === this.facesRotationData.length;
+
+      if (isFacesTargetPos && isLoadingStart && !this.targetStates.length) {
+        this.makeRoll();
+      }
+    }
+
+    if (this.data.isAnimation && this.restChecker?.()) {
+      this.setData({ isFinal: true });
     }
 
     lookAtCamera(camera, cubesGroup, this.lookTarget);
@@ -123,14 +163,23 @@ export default class SceneProvider {
 
   setData(value: SceneProviderDataUpdate) {
     const targetValuesUpdatedLength =
-      value.targetValues &&
-      value.targetValues.length !== this.data.targetValues.length;
+      value.isFinal === false ||
+      (value.targetValues &&
+        value.targetValues.length !== this.data.targetValues.length);
+    const facesOrTargetsUpdated =
+      (value.facesData &&
+        !compareArrays(value.facesData, this.data.facesData)) ||
+      (value.targetValues &&
+        !compareArrays(value.targetValues, this.data.targetValues));
 
     this.data = { ...this.data, ...value };
     this.updateCallback(this.data);
 
     if (targetValuesUpdatedLength) {
       this.syncTargetValuesWithScene();
+    }
+    if (facesOrTargetsUpdated) {
+      this.syncFacesRotationData();
     }
   }
   syncTargetValuesWithScene() {
@@ -182,8 +231,39 @@ export default class SceneProvider {
       this.sceneData.cubes.push({ body, mesh });
     }
 
+    this.worker?.terminate();
+
+    this.worker = new Worker(new URL("@/app/lib/worker.ts", import.meta.url), {
+      type: "module",
+    });
+
+    this.worker.onmessage = (
+      event: MessageEvent<{ facesData: FaceIndexData[] }>
+    ) => {
+      this.setData({ facesData: event.data.facesData });
+    };
+    this.worker.onerror = (e) => {
+      console.log(e);
+    };
+
+    this.worker.postMessage({
+      states: newRollReadyStates,
+    });
+
     this.targetStates = newTargetStates;
     this.rollReadyStates = newRollReadyStates;
+  }
+  syncFacesRotationData() {
+    const { targetValues, facesData } = this.data;
+    if (facesData.length && facesData.length === targetValues.length) {
+      this.facesRotationData = facesData
+        .map(({ face, index }, i) => ({
+          target: getFaceRotationQuant(face, this.data.targetValues[i]),
+          index,
+        }))
+        .toSorted((a, b) => a.index - b.index)
+        .map(({ target }) => ({ target, current: new THREE.Quaternion() }));
+    }
   }
   start() {
     this.loadingMeshesStates = this.sceneData.cubes.map(
@@ -195,6 +275,26 @@ export default class SceneProvider {
     }));
     this.setData({
       isLoading: true,
+    });
+  }
+  makeRoll() {
+    this.loadingMeshesStates = [];
+    this.targetStates = [];
+    this.setData({ isLoading: false, isAnimation: true, facesData: [] });
+    this.restChecker = getRestChecker(this.sceneData);
+
+    this.sceneData.world.gravity.set(0, gravitationValue, 0);
+    applyRollReadyStates(this.sceneData, this.rollReadyStates);
+  }
+  reset() {
+    this.facesRotationData = [];
+
+    this.sceneData = createScene(this.data.targetValues.length, this.canvas);
+    this.sceneData.world.gravity.set(0, 0, 0);
+
+    this.setData({
+      ...initialSceneProviderData,
+      targetValues: this.data.targetValues,
     });
   }
 }
