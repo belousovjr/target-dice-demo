@@ -30,4 +30,7 @@ export const defaultCubeRotateQ: Quaternion = [
 
 export const initialSceneProviderData: SceneProviderData = {
   targetValues: [],
+  isLoading: false,
 };
+
+export const loadingRotateStep = Math.PI / 18;

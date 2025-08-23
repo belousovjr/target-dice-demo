@@ -3,6 +3,7 @@ import {
   CubeTargetState,
   FaceIndex,
   Quaternion,
+  RollReadyState,
   SceneDataForRender,
   SceneProviderData,
   SceneProviderDataUpdate,
@@ -10,8 +11,10 @@ import {
 } from "./types";
 import {
   calcCubePosition,
+  calcLoadingStep,
   createCube,
   createScene,
+  genRollReadyState,
   lookAtCamera,
   moveBodyTowards,
   rotateBodyTowards,
@@ -32,6 +35,8 @@ export default class SceneProvider {
   lookTarget = new THREE.Vector3();
 
   targetStates: CubeTargetState[] = [];
+  rollReadyStates: RollReadyState[] = [];
+  loadingMeshesStates: THREE.Quaternion[] = [];
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -59,10 +64,13 @@ export default class SceneProvider {
     world.step(1 / 60);
 
     let doneStatesQty = 0;
+    let isLoadingStart = false;
 
     for (let i = 0; i < cubes.length; i++) {
       const cubeData = cubes[i];
       const targetState = this.targetStates[i];
+      const loadingQuant = this.loadingMeshesStates[i];
+      const rollReadyState = this.rollReadyStates[i];
 
       if (targetState) {
         const { vector, isDone: isMoveDone } = moveBodyTowards(
@@ -85,9 +93,26 @@ export default class SceneProvider {
       }
 
       syncMesh(cubeData);
+
+      if (!isLoadingStart && loadingQuant && rollReadyState) {
+        const { quant, isStartPosition } = calcLoadingStep(
+          loadingQuant,
+          rollReadyState.angleVelocity
+        );
+
+        loadingQuant.copy(quant);
+        if (!isStartPosition) {
+          cubeData.mesh.quaternion.premultiply(loadingQuant);
+        } else {
+          isLoadingStart = true;
+          this.loadingMeshesStates = this.loadingMeshesStates.map(
+            () => new THREE.Quaternion()
+          );
+        }
+      }
     }
 
-    if (doneStatesQty && doneStatesQty === this.targetStates.length) {
+    if (doneStatesQty === this.targetStates.length) {
       this.targetStates = [];
     }
 
@@ -111,6 +136,7 @@ export default class SceneProvider {
   syncTargetValuesWithScene() {
     const cubesQty = this.data.targetValues.length;
     const newTargetStates: CubeTargetState[] = [];
+    const newRollReadyStates: RollReadyState[] = [];
 
     const { world, cubesGroup } = this.sceneData;
 
@@ -148,6 +174,7 @@ export default class SceneProvider {
         position: targetPosition,
         rotate: defaultCubeRotateQ,
       });
+      newRollReadyStates.push(genRollReadyState());
 
       world.addBody(body);
       cubesGroup.add(mesh);
@@ -156,5 +183,18 @@ export default class SceneProvider {
     }
 
     this.targetStates = newTargetStates;
+    this.rollReadyStates = newRollReadyStates;
+  }
+  start() {
+    this.loadingMeshesStates = this.sceneData.cubes.map(
+      () => new THREE.Quaternion()
+    );
+    this.targetStates = this.rollReadyStates.map((item, i, arr) => ({
+      rotate: item.rotate,
+      position: calcCubePosition(arr.length, i),
+    }));
+    this.setData({
+      isLoading: true,
+    });
   }
 }

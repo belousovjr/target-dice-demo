@@ -4,6 +4,7 @@ import {
   CubeData,
   CubeDataForRender,
   Quaternion,
+  RollReadyState,
   SceneData,
   SceneDataForRender,
   Vector3,
@@ -13,6 +14,7 @@ import {
   cubeMaterialsNumbers,
   cubeOffset,
   cubeSize,
+  loadingRotateStep,
 } from "./constants";
 
 export function createDiceMaterial(number: number) {
@@ -224,5 +226,65 @@ export function rotateBodyTowards(
   return {
     quant: rotate.toArray(),
     isDone: false,
+  };
+}
+
+export function getRandomQuaternion() {
+  const q = new CANNON.Quaternion(
+    Math.random() * 2 - 1,
+    Math.random() * 2 - 1,
+    Math.random() * 2 - 1,
+    Math.random() * 2 - 1
+  );
+  q.normalize();
+  return q.toArray() as Quaternion;
+}
+
+export function getRandomVector3() {
+  return [
+    Math.random() * 2 - 1,
+    Math.random() * 2 - 1,
+    Math.random() * 2 - 1,
+  ] as Vector3;
+}
+
+export function genRollReadyState(): RollReadyState {
+  const v: Vector3 = getRandomVector3();
+  const angleVelocity = v.map((item) => item * 8) as Vector3;
+  const velocity = v.map((item) => item * 0.01) as Vector3;
+  velocity[1] += 0.065;
+  return {
+    rotate: getRandomQuaternion(),
+    angleVelocity,
+    velocity,
+  };
+}
+
+export function calcLoadingStep(
+  loadingQuant: THREE.Quaternion,
+  angleVelocity: Vector3
+) {
+  const quant = loadingQuant
+    .clone()
+    .multiply(
+      new THREE.Quaternion().setFromEuler(
+        new THREE.Euler().setFromVector3(
+          new THREE.Vector3(...angleVelocity)
+            .normalize()
+            .multiplyScalar(loadingRotateStep)
+        )
+      )
+    );
+  // .normalize();
+
+  const angle = 2 * Math.acos(Math.min(Math.max(quant.w, -1), 1));
+
+  const isStartPosition =
+    loadingQuant.w !== 1 &&
+    Math.min(Math.abs(Math.PI * 2 - angle), angle) < loadingRotateStep;
+
+  return {
+    quant,
+    isStartPosition,
   };
 }
