@@ -18,7 +18,6 @@ const APP_TITLE_TEMPLATE = "%s - Dice Demo";
 const APP_DESCRIPTION = "Dice roll simulation with pre-configurable outcomes.";
 
 export const metadata: Metadata = {
-  manifest: "/manifest.json",
   applicationName: APP_NAME,
   title: {
     default: APP_DEFAULT_TITLE,
