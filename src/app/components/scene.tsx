@@ -10,9 +10,9 @@ export default function Scene() {
     useSceneProvider(canvas);
 
   return (
-    <div>
+    <>
       {provider && (
-        <>
+        <div className="fixed z-10">
           {stage === "CONFIG" && (
             <>
               <button
@@ -26,7 +26,7 @@ export default function Scene() {
               <button onClick={start}>START</button>
             </>
           )}
-          {stage === "FINAL" && <button onClick={reset}>RESET</button>}{" "}
+          {stage !== "CONFIG" && <button onClick={reset}>RESET</button>}{" "}
           {targetValues.map((item, i) => (
             <label key={i}>
               {" "}
@@ -57,14 +57,12 @@ export default function Scene() {
               )}
             </label>
           ))}
-        </>
+        </div>
       )}
-      <center>
-        <canvas
-          ref={canvas}
-          className="max-w-full max-h-[100dvh] object-contain"
-        />
-      </center>
-    </div>
+      <canvas
+        ref={canvas}
+        className="fixed top-0 left-0 w-dvw max-h-dvh object-contain"
+      />
+    </>
   );
 }

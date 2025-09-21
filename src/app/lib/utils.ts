@@ -15,19 +15,19 @@ import {
   cubeMaterialsNumbers,
   cubeOffset,
   cubeSize,
-  displayHeight,
-  displayWidth,
   faceVectors,
   loadingRotateStep,
+  maxDisplayWidth,
+  maxDistance,
+  minDistance,
   restConfirmations,
+  stepsConfirmations,
+  traySizes,
 } from "./constants";
 import {
   BufferGeometryUtils,
-  GLTFLoader,
   OrbitControls,
 } from "three/examples/jsm/Addons.js";
-
-const loader = new GLTFLoader();
 
 export function createDiceMaterial(number: number) {
   const size = 256;
@@ -58,16 +58,16 @@ export function calcCubePosition(cubesQty: number, cubeIndex: number): Vector3 {
   return [(cubeIndex - (cubesQty - 1) / 2) * cubeOffset, cubeDefaultY, 0];
 }
 
-const groundMaterial = new CANNON.Material("ground");
+const trayMaterial = new CANNON.Material("ground");
 
 const diceMaterial = new CANNON.Material("dice");
 
 const diceGroundContact = new CANNON.ContactMaterial(
   diceMaterial,
-  groundMaterial,
+  trayMaterial,
   {
-    friction: 0.3,
-    restitution: 0.2,
+    friction: 0.2,
+    restitution: 0.4,
   }
 );
 
@@ -76,9 +76,9 @@ const boxShape = new CANNON.Box(
 );
 
 function createTray() {
-  const sizes = new THREE.Vector3(25, 4, 20);
-  const width = 0.5;
-  const chamfer = width * 8;
+  const sizes = traySizes;
+  const width = cubeSize * 0.3;
+  const chamfer = width * 10;
 
   const legSize = chamfer / Math.SQRT2;
 
@@ -285,14 +285,13 @@ function createTray() {
   const mesh = new THREE.Mesh(
     mergedGeometry,
     new THREE.MeshStandardMaterial({
-      color: 0x0000ff,
-      // transparent: true,
-      // opacity: 0.5,
+      color: 0xff0000,
     })
   );
 
   const body = new CANNON.Body({
     mass: 0,
+    material: trayMaterial,
   });
 
   for (const [size, pos, rot = 0] of geometriesData) {
@@ -342,15 +341,17 @@ export function createCube<
   return { body } as R;
 }
 
-function checkIsMesh(obj: THREE.Object3D): obj is THREE.Mesh {
-  return (obj as THREE.Mesh).isMesh;
-}
-
-export function createScene<
-  T extends HTMLCanvasElement | null,
-  S = T extends null ? SceneData : SceneDataForRender,
-  C = T extends null ? CubeData : CubeDataForRender
->(cubesQty: number, canvas: T): S {
+export function createScene(cubesQty: number, canvas: null): SceneData;
+export function createScene(
+  cubesQty: number,
+  canvas: HTMLCanvasElement,
+  oldSceneData?: SceneDataForRender
+): SceneDataForRender;
+export function createScene(
+  cubesQty: number,
+  canvas: HTMLCanvasElement | null,
+  oldSceneData?: SceneDataForRender
+): SceneData | SceneDataForRender {
   const world = new CANNON.World();
   world.gravity.set(0, 0, 0);
 
@@ -358,26 +359,22 @@ export function createScene<
 
   const scene = !!canvas && new THREE.Scene();
 
+  const { mesh: trayMesh, body: trayBody } = createTray();
+  world.addBody(trayBody);
+
   const cubesGroup = !!canvas && new THREE.Group();
+
   if (scene && cubesGroup) {
     scene.add(cubesGroup);
   }
 
-  const groundBody = new CANNON.Body({
-    mass: 0,
-    shape: new CANNON.Box(new CANNON.Vec3(50, 0.5, 50)),
-    position: new CANNON.Vec3(0, -0.5, 0),
-    material: groundMaterial,
-  });
-  world.addBody(groundBody);
-
-  const cubes: C[] = [];
+  const cubes: CubeData[] = [];
 
   for (let i = 0; i < cubesQty; i++) {
     const cubePosition = calcCubePosition(cubesQty, i);
 
     const cubeData = createCube(cubePosition, !!canvas);
-    cubes.push(cubeData as C);
+    cubes.push(cubeData);
 
     world.addBody(cubeData.body);
 
@@ -391,49 +388,50 @@ export function createScene<
     cubes,
   };
 
-  if (scene) {
+  if (scene && cubesGroup) {
     scene.background = new THREE.Color(0xaaaaaa);
 
+    const { w, h } = calcScreenSizes();
+
     const camera = new THREE.PerspectiveCamera(
-      85,
-      displayWidth / displayHeight,
+      getFovRange().max,
+      w / h,
       0.1,
       1000
     );
-    camera.position.set(0, 20, 30);
+    camera.position.set(0, cubeSize * 12, cubeSize * 10);
 
     const renderer = new THREE.WebGLRenderer({
       canvas: canvas,
       antialias: true,
     });
 
-    renderer.setSize(displayWidth, displayHeight, false);
+    renderer.setSize(w, h, false);
 
     const controls = new OrbitControls(camera, renderer.domElement);
 
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.enablePan = true;
+    controls.enablePan = false;
     controls.enableZoom = true;
-    controls.target.set(0, 0, 0);
+    controls.maxPolarAngle = Math.PI / 2 - 0.4;
+    controls.minDistance = minDistance;
+    controls.maxDistance = maxDistance;
+
+    if (oldSceneData) {
+      controls.target.copy(oldSceneData.controls.target.clone());
+      camera.position.copy(oldSceneData.camera.position.clone());
+      camera.quaternion.copy(oldSceneData.camera.quaternion.clone());
+      camera.fov = oldSceneData.camera.fov;
+      camera.updateProjectionMatrix();
+    }
+
     controls.update();
 
     const light = new THREE.DirectionalLight(0xffffff, 1);
     light.position.set(5, 10, 7.5);
     scene.add(light);
-
-    const groundGeo = new THREE.BoxGeometry(100, 1, 100);
-    const groundMat = new THREE.MeshStandardMaterial({
-      color: 0xff0000,
-    });
-    const groundMesh = new THREE.Mesh(groundGeo, groundMat);
-
-    groundMesh.position.copy(groundBody.position);
-    scene.add(groundMesh);
-
-    const { mesh: trayMesh, body: trayBody } = createTray();
     scene.add(trayMesh);
-    world.addBody(trayBody);
 
     return {
       ...result,
@@ -442,25 +440,10 @@ export function createScene<
       camera,
       cubesGroup,
       controls,
-    } as S;
+    };
   }
 
-  return result as S;
-}
-
-export function lookAtCamera(
-  camera: THREE.Camera,
-  target: THREE.Object3D,
-  lookTarget: THREE.Vector3
-) {
-  const box = new THREE.Box3().setFromObject(target);
-  const center = new THREE.Vector3();
-  box.getCenter(center);
-  const targetCenter = new THREE.Vector3(0, center.y, 0);
-
-  lookTarget.lerp(targetCenter, 0.1);
-
-  camera.lookAt(lookTarget);
+  return result;
 }
 
 export function moveBodyTowards(
@@ -493,8 +476,8 @@ export function moveBodyTowards(
 export function rotateBodyTowards(
   rotateV: Quaternion,
   targetV: Quaternion,
-  threshold = 0.001,
-  step = 0.05
+  step = 0.08,
+  threshold = 0.001
 ): { quant: Quaternion; isDone: boolean } {
   const rotate = new THREE.Quaternion(...rotateV);
   const target = new THREE.Quaternion(...targetV);
@@ -538,8 +521,10 @@ export function getRandomVector3() {
 export function genRollReadyState(): RollReadyState {
   const v: Vector3 = getRandomVector3();
   const angleVelocity = v.map((item) => item * 8) as Vector3;
-  const velocity = v.map((item) => item * 1) as Vector3;
-  velocity[1] += 20;
+  const velocity = v.map(
+    (item) => item * 0.5 + Math.sign(item) * 0.5
+  ) as Vector3;
+  velocity[1] = 8 + 4 * Math.random();
   return {
     rotate: getRandomQuaternion(),
     angleVelocity,
@@ -588,14 +573,19 @@ export function getFaceRotationQuant(from: FaceIndex, to: FaceIndex) {
 
 export function getRestChecker(sceneData: SceneData) {
   let finalConfirmation = 0;
+  let steps = 0;
   return () => {
     const sumVelocity = sceneData.cubes.reduce(
       (res, { body }) =>
         res + body.velocity.length() + body.angularVelocity.length(),
       0
     );
+    steps++;
 
-    if (sumVelocity / sceneData.cubes.length < 0.01) {
+    if (
+      steps >= stepsConfirmations ||
+      sumVelocity / sceneData.cubes.length < 0.01
+    ) {
       finalConfirmation++;
       if (finalConfirmation >= restConfirmations) {
         return true;
@@ -625,4 +615,38 @@ export function applyRollReadyStates(
       cubeData.body.position.clone()
     );
   }
+}
+
+export function calcTarget(target: THREE.Object3D, lookTarget?: THREE.Vector3) {
+  const box = new THREE.Box3().setFromObject(target);
+  const center = new THREE.Vector3();
+  box.getCenter(center);
+  const targetCenter = new THREE.Vector3(0, center.y, 0);
+
+  return lookTarget ? lookTarget.clone().lerp(targetCenter, 0.1) : targetCenter;
+}
+
+export function calcFov(camera: THREE.PerspectiveCamera, sign: -1 | 1) {
+  const { max, min } = getFovRange();
+  const finValue = sign > 0 ? max : min;
+  if (camera.fov !== finValue) {
+    camera.fov += sign * 0.03;
+    if (Math.sign(finValue - camera.fov) !== sign) {
+      camera.fov = finValue;
+    }
+    camera.updateProjectionMatrix();
+  }
+}
+
+export function calcScreenSizes() {
+  const factor = window.innerHeight / window.innerWidth;
+  const w = Math.min(maxDisplayWidth, window.innerWidth);
+  const h = factor * w;
+
+  return { w, h };
+}
+
+export function getFovRange() {
+  const max = 20 / (window.innerWidth / window.innerHeight) + 60;
+  return { max, min: max - 15 };
 }

@@ -14,7 +14,7 @@ export default function useSceneProvider(
       setProvider(
         new SceneProvider(
           canvas.current,
-          [4, 2],
+          [1],
           ({ isLoading, isAnimation, isFinal, targetValues }) => {
             const newStage: ProviderStage = isFinal
               ? "FINAL"
@@ -31,6 +31,17 @@ export default function useSceneProvider(
       );
     }
   }, [canvas, provider]);
+
+  useEffect(() => {
+    const resizeHandler = () => {
+      provider?.syncSizes();
+    };
+
+    window.addEventListener("resize", resizeHandler);
+    return () => {
+      window.removeEventListener("resize", resizeHandler);
+    };
+  }, [provider]);
 
   return {
     provider,

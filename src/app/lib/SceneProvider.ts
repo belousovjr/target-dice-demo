@@ -21,10 +21,12 @@ import {
   genRollReadyState,
   getFaceRotationQuant,
   getRestChecker,
-  lookAtCamera,
   moveBodyTowards,
   rotateBodyTowards,
   syncMesh,
+  calcTarget,
+  calcFov,
+  calcScreenSizes,
 } from "./utils";
 import {
   cubeDefaultY,
@@ -37,7 +39,7 @@ import {
 export default class SceneProvider {
   sceneData: SceneDataForRender;
   data: SceneProviderData;
-  updateCallback: (value: SceneProviderData) => void;
+  #updateCallback: (value: SceneProviderData) => void;
   canvas: HTMLCanvasElement;
   lookTarget = new THREE.Vector3();
 
@@ -47,7 +49,8 @@ export default class SceneProvider {
   facesRotationData: FaceRotationData[] = [];
 
   worker: Worker | undefined;
-  restChecker: (() => boolean) | undefined;
+  #restChecker: (() => boolean) | undefined;
+  rollCalc = 0;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -58,22 +61,25 @@ export default class SceneProvider {
     this.data = {
       ...{ ...initialSceneProviderData, targetValues },
     };
-    this.updateCallback = callback;
-    this.updateCallback(this.data);
+    this.#updateCallback = callback;
+    this.#updateCallback(this.data);
 
     this.sceneData = createScene(targetValues.length, canvas);
+    this.lookTarget = calcTarget(this.sceneData.cubesGroup);
 
-    this.syncTargetValuesWithScene();
+    this.#syncTargetValuesWithScene();
 
-    this.animate();
+    this.#animate();
   }
 
-  animate() {
-    requestAnimationFrame(this.animate.bind(this));
+  #animate() {
+    if (this.data.isAnimation) {
+      this.rollCalc++;
+    }
+    requestAnimationFrame(this.#animate.bind(this));
     const { world, scene, camera, renderer, cubes, cubesGroup, controls } =
       this.sceneData;
     world.step(1 / 60);
-
     let doneStatesQty = 0;
     let doneFacesRotQty = 0;
     let isLoadingStart = false;
@@ -148,16 +154,22 @@ export default class SceneProvider {
         doneFacesRotQty === this.facesRotationData.length;
 
       if (isFacesTargetPos && isLoadingStart && !this.targetStates.length) {
-        this.makeRoll();
+        this.#makeRoll();
       }
+
+      calcFov(camera, -1);
+    } else {
+      calcFov(camera, 1);
     }
 
-    if (this.data.isAnimation && this.restChecker?.()) {
+    if (this.data.isAnimation && this.#restChecker?.()) {
       this.setData({ isFinal: true });
     }
 
+    this.lookTarget = calcTarget(cubesGroup, this.lookTarget);
+    controls.target.copy(this.lookTarget);
+
     controls.update();
-    // lookAtCamera(camera, cubesGroup, this.lookTarget);
 
     renderer.render(scene, camera);
   }
@@ -174,16 +186,16 @@ export default class SceneProvider {
         !compareArrays(value.targetValues, this.data.targetValues));
 
     this.data = { ...this.data, ...value };
-    this.updateCallback(this.data);
+    this.#updateCallback(this.data);
 
     if (targetValuesUpdatedLength) {
-      this.syncTargetValuesWithScene();
+      this.#syncTargetValuesWithScene();
     }
     if (facesOrTargetsUpdated) {
-      this.syncFacesRotationData();
+      this.#syncFacesRotationData();
     }
   }
-  syncTargetValuesWithScene() {
+  #syncTargetValuesWithScene() {
     const cubesQty = this.data.targetValues.length;
     const newTargetStates: CubeTargetState[] = [];
     const newRollReadyStates: RollReadyState[] = [];
@@ -244,7 +256,7 @@ export default class SceneProvider {
       this.setData({ facesData: event.data.facesData });
     };
     this.worker.onerror = (e) => {
-      console.log(e);
+      e.preventDefault();
     };
 
     this.worker.postMessage({
@@ -254,7 +266,7 @@ export default class SceneProvider {
     this.targetStates = newTargetStates;
     this.rollReadyStates = newRollReadyStates;
   }
-  syncFacesRotationData() {
+  #syncFacesRotationData() {
     const { targetValues, facesData } = this.data;
     if (facesData.length && facesData.length === targetValues.length) {
       this.facesRotationData = facesData
@@ -278,24 +290,41 @@ export default class SceneProvider {
       isLoading: true,
     });
   }
-  makeRoll() {
+  #makeRoll() {
     this.loadingMeshesStates = [];
     this.targetStates = [];
     this.setData({ isLoading: false, isAnimation: true, facesData: [] });
-    this.restChecker = getRestChecker(this.sceneData);
+    this.#restChecker = getRestChecker(this.sceneData);
 
     this.sceneData.world.gravity.set(0, gravitationValue, 0);
     applyRollReadyStates(this.sceneData, this.rollReadyStates);
   }
   reset() {
+    this.targetStates = [];
+    this.rollReadyStates = [];
+    this.loadingMeshesStates = [];
     this.facesRotationData = [];
+    this.#restChecker = undefined;
+    this.worker = undefined;
 
-    this.sceneData = createScene(this.data.targetValues.length, this.canvas);
+    this.sceneData = createScene(
+      this.data.targetValues.length,
+      this.canvas,
+      this.sceneData
+    );
     this.sceneData.world.gravity.set(0, 0, 0);
 
     this.setData({
       ...initialSceneProviderData,
       targetValues: this.data.targetValues,
     });
+  }
+  syncSizes() {
+    const { w, h } = calcScreenSizes();
+    const { camera, renderer } = this.sceneData;
+
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h, false);
   }
 }
