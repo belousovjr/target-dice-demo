@@ -21,6 +21,13 @@ import {
   loadingRotateStep,
   restConfirmations,
 } from "./constants";
+import {
+  BufferGeometryUtils,
+  GLTFLoader,
+  OrbitControls,
+} from "three/examples/jsm/Addons.js";
+
+const loader = new GLTFLoader();
 
 export function createDiceMaterial(number: number) {
   const size = 256;
@@ -51,24 +58,273 @@ export function calcCubePosition(cubesQty: number, cubeIndex: number): Vector3 {
   return [(cubeIndex - (cubesQty - 1) / 2) * cubeOffset, cubeDefaultY, 0];
 }
 
+const groundMaterial = new CANNON.Material("ground");
+
+const diceMaterial = new CANNON.Material("dice");
+
+const diceGroundContact = new CANNON.ContactMaterial(
+  diceMaterial,
+  groundMaterial,
+  {
+    friction: 0.3,
+    restitution: 0.2,
+  }
+);
+
+const boxShape = new CANNON.Box(
+  new CANNON.Vec3(cubeSize / 2, cubeSize / 2, cubeSize / 2)
+);
+
+function createTray() {
+  const sizes = new THREE.Vector3(25, 4, 20);
+  const width = 0.5;
+  const chamfer = width * 8;
+
+  const legSize = chamfer / Math.SQRT2;
+
+  const halfX = sizes.x / 2;
+  const halfY = sizes.y / 2;
+  const halfZ = sizes.z / 2;
+
+  const midY = width / 2;
+  const topY = sizes.y - width / 2;
+
+  const chamferCut = chamfer - width * Math.SQRT2;
+  const offset = (width * (Math.SQRT2 + 1)) / 4;
+
+  const geometriesData = [
+    // floor
+    [
+      [sizes.x - legSize * 2, width, sizes.z],
+      [0, midY, 0],
+    ],
+    [
+      [legSize, width, sizes.z - legSize * 2],
+      [-halfX + legSize / 2, midY, 0],
+    ],
+    [
+      [legSize, width, sizes.z - legSize * 2],
+      [halfX - legSize / 2, midY, 0],
+    ],
+    [
+      [chamfer, width, chamfer],
+      [-halfX + legSize, midY, -halfZ + legSize],
+      Math.PI / 4,
+    ],
+    [
+      [chamfer, width, chamfer],
+      [-halfX + legSize, midY, halfZ - legSize],
+      Math.PI / 4,
+    ],
+    [
+      [chamfer, width, chamfer],
+      [halfX - legSize, midY, -halfZ + legSize],
+      Math.PI / 4,
+    ],
+    [
+      [chamfer, width, chamfer],
+      [halfX - legSize, midY, halfZ - legSize],
+      Math.PI / 4,
+    ],
+
+    // second layer
+    [
+      [width * 2, width, sizes.z - legSize * 2],
+      [-halfX + width * 2, midY + width, 0],
+    ],
+    [
+      [sizes.x - legSize * 2, width, width * 2],
+      [0, midY + width, -halfZ + width * 2],
+    ],
+    [
+      [width * 2, width, chamferCut],
+      [
+        -halfX + legSize / 2 + width / Math.SQRT2 + width / 2,
+        midY + width,
+        halfZ - (legSize / 2 + width / Math.SQRT2 + width / 2),
+      ],
+      Math.PI / 4,
+    ],
+    [
+      [width * 2, width, chamferCut],
+      [
+        -halfX + legSize / 2 + width / Math.SQRT2 + width / 2,
+        midY + width,
+        -halfZ + legSize / 2 + width / Math.SQRT2 + width / 2,
+      ],
+      -Math.PI / 4,
+    ],
+    [
+      [width * 2, width, sizes.z - legSize * 2],
+      [halfX - width * 2, midY + width, 0],
+    ],
+    [
+      [sizes.x - legSize * 2, width, width * 2],
+      [0, midY + width, halfZ - width * 2],
+    ],
+    [
+      [width * 2, width, chamferCut],
+      [
+        halfX - (legSize / 2 + width / Math.SQRT2 + width / 2),
+        midY + width,
+        halfZ - (legSize / 2 + width / Math.SQRT2 + width / 2),
+      ],
+      -Math.PI / 4,
+    ],
+    [
+      [width * 2, width, chamferCut],
+      [
+        halfX - (legSize / 2 + width / Math.SQRT2 + width / 2),
+        midY + width,
+        -halfZ + legSize / 2 + width / Math.SQRT2 + width / 2,
+      ],
+      Math.PI / 4,
+    ],
+
+    // vertical walls
+    [
+      [width, sizes.y - width * 3, sizes.z - legSize * 2],
+      [-halfX + width * 1.5, midY + halfY, 0],
+    ],
+    [
+      [sizes.x - legSize * 2, sizes.y - width * 3, width],
+      [0, midY + halfY, -halfZ + width * 1.5],
+    ],
+    [
+      [width, sizes.y - width * 3, chamferCut],
+      [
+        -halfX + legSize / 2 + width / (2 * Math.SQRT2) + width / 2,
+        midY + halfY,
+        halfZ - (legSize / 2 + width / (2 * Math.SQRT2) + width / 2),
+      ],
+      Math.PI / 4,
+    ],
+    [
+      [width, sizes.y - width * 3, chamferCut],
+      [
+        -halfX + legSize / 2 + width / (2 * Math.SQRT2) + width / 2,
+        midY + halfY,
+        -halfZ + legSize / 2 + width / (2 * Math.SQRT2) + width / 2,
+      ],
+      -Math.PI / 4,
+    ],
+    [
+      [width, sizes.y - width * 3, sizes.z - legSize * 2],
+      [halfX - width * 1.5, midY + halfY, 0],
+    ],
+    [
+      [sizes.x - legSize * 2, sizes.y - width * 3, width],
+      [0, midY + halfY, halfZ - width * 1.5],
+    ],
+    [
+      [width, sizes.y - width * 3, chamferCut],
+      [
+        halfX - (legSize / 2 + width / (2 * Math.SQRT2) + width / 2),
+        midY + halfY,
+        halfZ - (legSize / 2 + width / (2 * Math.SQRT2) + width / 2),
+      ],
+      -Math.PI / 4,
+    ],
+    [
+      [width, sizes.y - width * 3, chamferCut],
+      [
+        halfX - (legSize / 2 + width / (2 * Math.SQRT2) + width / 2),
+        midY + halfY,
+        -halfZ + legSize / 2 + width / (2 * Math.SQRT2) + width / 2,
+      ],
+      Math.PI / 4,
+    ],
+
+    // top
+    [
+      [width * 2, width, sizes.z - legSize * 2],
+      [-halfX + width, topY, 0],
+    ],
+    [
+      [sizes.x - legSize * 2, width, width * 2],
+      [0, topY, -halfZ + width],
+    ],
+    [
+      [width * 2, width, sizes.z - legSize * 2],
+      [halfX - width, topY, 0],
+    ],
+    [
+      [sizes.x - legSize * 2, width, width * 2],
+      [0, topY, halfZ - width],
+    ],
+    [
+      [width * (1 + Math.SQRT2 - 1 / Math.SQRT2), width, chamfer],
+      [-halfX + legSize / 2 + offset, topY, halfZ - (legSize / 2 + offset)],
+      Math.PI / 4,
+    ],
+    [
+      [width * (1 + Math.SQRT2 - 1 / Math.SQRT2), width, chamfer],
+      [-halfX + legSize / 2 + offset, topY, -halfZ + (legSize / 2 + offset)],
+      -Math.PI / 4,
+    ],
+    [
+      [width * (1 + Math.SQRT2 - 1 / Math.SQRT2), width, chamfer],
+      [halfX - legSize / 2 - offset, topY, halfZ - (legSize / 2 + offset)],
+      -Math.PI / 4,
+    ],
+    [
+      [width * (1 + Math.SQRT2 - 1 / Math.SQRT2), width, chamfer],
+      [halfX - legSize / 2 - offset, topY, -halfZ + (legSize / 2 + offset)],
+      Math.PI / 4,
+    ],
+  ];
+
+  const prepGeometry = geometriesData.map(([size, pos, rot]) =>
+    new THREE.BoxGeometry(...(size as [number, number, number]))
+      .rotateY((rot ?? 0) as number)
+      .translate(...(pos as [number, number, number]))
+  );
+
+  const mergedGeometry = BufferGeometryUtils.mergeGeometries(prepGeometry);
+
+  const mesh = new THREE.Mesh(
+    mergedGeometry,
+    new THREE.MeshStandardMaterial({
+      color: 0x0000ff,
+      // transparent: true,
+      // opacity: 0.5,
+    })
+  );
+
+  const body = new CANNON.Body({
+    mass: 0,
+  });
+
+  for (const [size, pos, rot = 0] of geometriesData) {
+    const shape = new CANNON.Box(
+      new CANNON.Vec3(...(size as [number, number, number]).map((v) => v / 2))
+    );
+
+    const shapeQuat = new CANNON.Quaternion();
+    shapeQuat.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), rot as number);
+
+    body.addShape(
+      shape,
+      new CANNON.Vec3(...(pos as [number, number, number])),
+      shapeQuat
+    );
+  }
+
+  return { mesh, body };
+}
+
 export function createCube<
   T extends boolean,
   R = T extends true ? CubeDataForRender : CubeData
 >(position: Vector3, withMesh: T): R {
-  const diceMaterial = new CANNON.Material("dice");
-  diceMaterial.friction = 0.4;
-  diceMaterial.restitution = 0.25;
-
   const body = new CANNON.Body({
-    mass: 0.005,
-    shape: new CANNON.Box(
-      new CANNON.Vec3(cubeSize / 2, cubeSize / 2, cubeSize / 2)
-    ),
+    mass: 1,
+    shape: boxShape,
     position: new CANNON.Vec3(...position),
     material: diceMaterial,
   });
-  body.linearDamping = 0.08;
-  body.angularDamping = 0.12;
+  body.linearDamping = 0.01;
+  body.angularDamping = 0.1;
 
   let mesh: THREE.Mesh | undefined;
 
@@ -86,6 +342,10 @@ export function createCube<
   return { body } as R;
 }
 
+function checkIsMesh(obj: THREE.Object3D): obj is THREE.Mesh {
+  return (obj as THREE.Mesh).isMesh;
+}
+
 export function createScene<
   T extends HTMLCanvasElement | null,
   S = T extends null ? SceneData : SceneDataForRender,
@@ -93,6 +353,8 @@ export function createScene<
 >(cubesQty: number, canvas: T): S {
   const world = new CANNON.World();
   world.gravity.set(0, 0, 0);
+
+  world.addContactMaterial(diceGroundContact);
 
   const scene = !!canvas && new THREE.Scene();
 
@@ -105,6 +367,7 @@ export function createScene<
     mass: 0,
     shape: new CANNON.Box(new CANNON.Vec3(50, 0.5, 50)),
     position: new CANNON.Vec3(0, -0.5, 0),
+    material: groundMaterial,
   });
   world.addBody(groundBody);
 
@@ -137,7 +400,7 @@ export function createScene<
       0.1,
       1000
     );
-    camera.position.set(0, 10, 8);
+    camera.position.set(0, 20, 30);
 
     const renderer = new THREE.WebGLRenderer({
       canvas: canvas,
@@ -145,6 +408,15 @@ export function createScene<
     });
 
     renderer.setSize(displayWidth, displayHeight, false);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.enablePan = true;
+    controls.enableZoom = true;
+    controls.target.set(0, 0, 0);
+    controls.update();
 
     const light = new THREE.DirectionalLight(0xffffff, 1);
     light.position.set(5, 10, 7.5);
@@ -159,12 +431,17 @@ export function createScene<
     groundMesh.position.copy(groundBody.position);
     scene.add(groundMesh);
 
+    const { mesh: trayMesh, body: trayBody } = createTray();
+    scene.add(trayMesh);
+    world.addBody(trayBody);
+
     return {
       ...result,
       scene,
       renderer,
       camera,
       cubesGroup,
+      controls,
     } as S;
   }
 
@@ -261,8 +538,8 @@ export function getRandomVector3() {
 export function genRollReadyState(): RollReadyState {
   const v: Vector3 = getRandomVector3();
   const angleVelocity = v.map((item) => item * 8) as Vector3;
-  const velocity = v.map((item) => item * 0.01) as Vector3;
-  velocity[1] += 0.065;
+  const velocity = v.map((item) => item * 1) as Vector3;
+  velocity[1] += 20;
   return {
     rotate: getRandomQuaternion(),
     angleVelocity,

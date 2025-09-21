@@ -1,6 +1,7 @@
 import CANNON from "cannon";
 import * as THREE from "three";
 import { faceVectors } from "./constants";
+import { OrbitControls } from "three/examples/jsm/Addons.js";
 
 export type FaceIndex = keyof typeof faceVectors;
 
@@ -28,6 +29,7 @@ export interface SceneDataForRender extends SceneData {
   renderer: THREE.WebGLRenderer;
   cubes: CubeDataForRender[];
   cubesGroup: THREE.Group;
+  controls: OrbitControls;
 }
 
 export type Vector3 = [number, number, number];

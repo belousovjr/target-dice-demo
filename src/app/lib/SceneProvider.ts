@@ -70,7 +70,7 @@ export default class SceneProvider {
 
   animate() {
     requestAnimationFrame(this.animate.bind(this));
-    const { world, scene, camera, renderer, cubes, cubesGroup } =
+    const { world, scene, camera, renderer, cubes, cubesGroup, controls } =
       this.sceneData;
     world.step(1 / 60);
 
@@ -156,7 +156,8 @@ export default class SceneProvider {
       this.setData({ isFinal: true });
     }
 
-    lookAtCamera(camera, cubesGroup, this.lookTarget);
+    controls.update();
+    // lookAtCamera(camera, cubesGroup, this.lookTarget);
 
     renderer.render(scene, camera);
   }
