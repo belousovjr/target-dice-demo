@@ -6,10 +6,10 @@ import {
   FaceRotationData,
   Quaternion,
   RollReadyState,
+  SceneAssets,
   SceneDataForRender,
   SceneProviderData,
   SceneProviderDataUpdate,
-  SceneTextures,
   Vector3,
 } from "./types";
 import {
@@ -41,8 +41,7 @@ export default class SceneProvider {
   sceneData: SceneDataForRender;
   data: SceneProviderData;
   #updateCallback: (value: SceneProviderData) => void;
-  canvas: HTMLCanvasElement;
-  textures: SceneTextures;
+  assets: SceneAssets;
   lookTarget = new THREE.Vector3();
 
   targetStates: CubeTargetState[] = [];
@@ -54,24 +53,21 @@ export default class SceneProvider {
   #restChecker: (() => boolean) | undefined;
 
   constructor(
-    canvas: HTMLCanvasElement,
-    textures: SceneTextures,
+    assets: SceneAssets,
     targetValues: FaceIndex[],
     callback: (value: SceneProviderData) => void
   ) {
-    this.canvas = canvas;
-    this.textures = textures;
+    this.assets = assets;
     this.data = {
       ...{ ...initialSceneProviderData, targetValues },
     };
     this.#updateCallback = callback;
     this.#updateCallback(this.data);
 
-    this.sceneData = createScene(targetValues.length, { canvas, textures });
+    this.sceneData = createScene(targetValues.length, assets);
     this.lookTarget = calcTarget(this.sceneData.cubesGroup);
 
     this.#syncTargetValuesWithScene();
-
     this.#animate();
   }
   #animate() {
@@ -152,16 +148,15 @@ export default class SceneProvider {
           doneFacesRotQty === this.facesRotationData.length;
         if (isFacesTargetPos && isLoadingStart && !this.targetStates.length)
           this.#makeRoll();
-        calcFov(camera, -1);
-      } else {
-        calcFov(camera, 1);
       }
-
-      this.lookTarget = calcTarget(cubesGroup, this.lookTarget);
-      controls.target.copy(this.lookTarget);
     } else if (isAnimation) {
       this.setData({ isFinal: true });
     }
+
+    calcFov(camera, isLoading ? -1 : 1);
+
+    this.lookTarget = calcTarget(cubesGroup, this.lookTarget);
+    controls.target.copy(this.lookTarget);
 
     controls.update();
     renderer.render(scene, camera);
@@ -220,10 +215,7 @@ export default class SceneProvider {
           ? prevCubeBody.position.x + cubeOffset
           : targetPosition[0];
 
-        const newCubeData = createCube(
-          [coordX, cubeDefaultY, 0],
-          this.textures
-        );
+        const newCubeData = createCube([coordX, cubeDefaultY, 0], this.assets);
         body = newCubeData.body;
         mesh = newCubeData.mesh!;
       }
@@ -305,7 +297,7 @@ export default class SceneProvider {
 
     this.sceneData = createScene(
       this.data.targetValues.length,
-      { canvas: this.canvas, textures: this.textures },
+      this.assets,
       this.sceneData
     );
     this.sceneData.world.gravity.set(0, 0, 0);

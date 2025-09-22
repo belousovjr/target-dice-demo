@@ -71,11 +71,8 @@ export interface FaceRotationData {
 
 export type ProviderStage = "CONFIG" | "LOADING" | "ANIMATION" | "FINAL";
 
-export interface SceneTextures {
-  tray: {
-    albedo: THREE.Texture;
-    ao: THREE.Texture;
-    normal: THREE.Texture;
-  };
-  dice: THREE.Texture[];
+export interface SceneAssets {
+  tray: THREE.Mesh;
+  dice: THREE.Mesh;
+  renderer: THREE.WebGLRenderer;
 }

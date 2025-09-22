@@ -6,9 +6,9 @@ import {
   FaceIndex,
   Quaternion,
   RollReadyState,
+  SceneAssets,
   SceneData,
   SceneDataForRender,
-  SceneTextures,
   Vector3,
 } from "./types";
 import {
@@ -26,6 +26,7 @@ import {
   minDistance,
   restConfirmations,
   stepsConfirmations,
+  trayGeo,
   trayMaterial,
   traySizes,
 } from "./constants";
@@ -34,7 +35,6 @@ import {
   OrbitControls,
 } from "three/examples/jsm/Addons.js";
 import createDiceTextures from "dice-textures";
-import { genTrayGeometric } from "./tray-geo";
 
 export function syncMesh(cubeData: CubeDataForRender) {
   cubeData.mesh.position.copy(cubeData.body.position);
@@ -45,7 +45,35 @@ export function calcCubePosition(cubesQty: number, cubeIndex: number): Vector3 {
   return [(cubeIndex - (cubesQty - 1) / 2) * cubeOffset, cubeDefaultY, 0];
 }
 
-export async function loadTextures(): Promise<SceneTextures> {
+function processInChunks<T, R>(
+  data: T[],
+  callback: (item: T, index: number, array: T[]) => R,
+  chunkSize: number = 50
+): Promise<R[]> {
+  const results: R[] = [];
+  return new Promise((resolve) => {
+    let index = 0;
+
+    function processChunk() {
+      const end = Math.min(index + chunkSize, data.length);
+      for (; index < end; index++) {
+        results.push(callback(data[index], index, data));
+      }
+
+      if (index < data.length) {
+        requestAnimationFrame(processChunk);
+      } else {
+        resolve(results);
+      }
+    }
+
+    requestAnimationFrame(processChunk);
+  });
+}
+
+export async function loadAssets(
+  canvas: HTMLCanvasElement
+): Promise<SceneAssets> {
   const loader = new THREE.TextureLoader();
 
   const [albedo, ao, normal, ...dice] = await Promise.all([
@@ -59,30 +87,81 @@ export async function loadTextures(): Promise<SceneTextures> {
       ),
     ].map(
       (item) =>
-        new Promise<THREE.Texture>((resolve) => {
-          loader.load(item, resolve);
-        })
+        new Promise<THREE.Texture>((resolve) => loader.load(item, resolve))
     ),
   ]);
 
-  return { tray: { albedo, ao, normal }, dice };
-}
+  const diceRenderMat = cubeMaterialsNumbers.map((index) => {
+    const map = dice[index - 1];
+    return new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      map: map,
+    });
+  });
 
-function createTray(textures?: SceneTextures) {
-  const geometriesData = genTrayGeometric();
-  const prepGeometry = geometriesData.map(
+  const trayRenderMat = new THREE.MeshStandardMaterial({
+    color: 0x1e5eff,
+    map: albedo,
+    aoMap: ao,
+    normalMap: normal,
+  });
+
+  const prepGeometry = trayGeo.map(
     ([size, pos, rot]) =>
       new THREE.Mesh(
         new THREE.BoxGeometry(...size).rotateY(rot ?? 0).translate(...pos)
       )
   );
 
+  const unitedGeometry = BufferGeometryUtils.mergeVertices(
+    BufferGeometryUtils.mergeGeometries(
+      prepGeometry.map((m) => m.geometry),
+      false
+    ),
+    0.001
+  );
+
+  const cubeGeo = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
+
+  const trayMesh = new THREE.Mesh(unitedGeometry, trayRenderMat);
+  const diceMesh = new THREE.Mesh(cubeGeo, diceRenderMat);
+
+  trayMesh.receiveShadow = true;
+  trayMesh.castShadow = true;
+
+  diceMesh.receiveShadow = true;
+  diceMesh.castShadow = true;
+
+  const renderer = new THREE.WebGLRenderer({
+    canvas,
+    antialias: true,
+    alpha: true,
+  });
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.enabled = true;
+
+  await processInChunks(
+    [albedo, ao, normal, ...dice],
+    (texture) => {
+      renderer.initTexture(texture);
+    },
+    1
+  );
+
+  return {
+    tray: trayMesh,
+    dice: diceMesh,
+    renderer,
+  };
+}
+
+function createTray(assets?: SceneAssets) {
   const body = new CANNON.Body({
     mass: 0,
     material: trayMaterial,
   });
 
-  for (const [size, pos, rot = 0] of geometriesData) {
+  for (const [size, pos, rot = 0] of trayGeo) {
     const shape = new CANNON.Box(
       new CANNON.Vec3(...(size as [number, number, number]).map((v) => v / 2))
     );
@@ -97,37 +176,16 @@ function createTray(textures?: SceneTextures) {
     );
   }
 
-  if (!textures) {
+  if (!assets) {
     return { body };
   }
 
-  const unitedGeometry = BufferGeometryUtils.mergeVertices(
-    BufferGeometryUtils.mergeGeometries(
-      prepGeometry.map((m) => m.geometry),
-      false
-    ),
-    0.001
-  );
-
-  const { albedo, ao, normal } = textures.tray;
-
-  const mesh = new THREE.Mesh(
-    unitedGeometry,
-    new THREE.MeshStandardMaterial({
-      color: 0x1e5eff,
-      map: albedo,
-      aoMap: ao,
-      normalMap: normal,
-    })
-  );
-
-  mesh.receiveShadow = true;
-  mesh.castShadow = true;
+  const mesh = assets.tray;
 
   return { mesh, body };
 }
 
-export function createCube(position: Vector3, textures?: SceneTextures) {
+export function createCube(position: Vector3, assets?: SceneAssets) {
   const body = new CANNON.Body({
     mass: 1,
     shape: boxShape,
@@ -139,21 +197,10 @@ export function createCube(position: Vector3, textures?: SceneTextures) {
 
   let mesh: THREE.Mesh | undefined;
 
-  if (textures) {
+  if (assets) {
     const cubeGeo = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
     cubeGeo.computeVertexNormals();
-
-    const mat = cubeMaterialsNumbers.map((index) => {
-      const map = textures.dice[index - 1];
-      return new THREE.MeshPhysicalMaterial({
-        color: 0xffffff,
-        map: map,
-      });
-    });
-
-    mesh = new THREE.Mesh(cubeGeo, mat);
-    mesh.receiveShadow = true;
-    mesh.castShadow = true;
+    const mesh = assets.dice.clone();
 
     const cubeData = { body, mesh };
 
@@ -161,40 +208,41 @@ export function createCube(position: Vector3, textures?: SceneTextures) {
 
     return cubeData;
   } else {
-    return { body, mesh: undefined };
+    return { body, mesh };
   }
 }
 
 export function createScene(
   cubesQty: number,
-  renderData: null,
+  assets: null,
   oldSceneData?: SceneDataForRender
 ): SceneData;
 export function createScene(
   cubesQty: number,
-  renderData: { canvas: HTMLCanvasElement; textures: SceneTextures },
+  assets: SceneAssets,
   oldSceneData?: SceneDataForRender
 ): SceneDataForRender;
 export function createScene(
   cubesQty: number,
-  renderData: { canvas: HTMLCanvasElement; textures: SceneTextures } | null,
+  assets: SceneAssets | null,
   oldSceneData?: SceneDataForRender
 ): SceneData | SceneDataForRender {
   const world = new CANNON.World();
   world.gravity.set(0, 0, 0);
   world.addContactMaterial(diceGroundContact);
 
-  const tray = oldSceneData?.tray ?? createTray(renderData?.textures);
+  const tray = oldSceneData?.tray ?? createTray(assets ?? undefined);
   world.addBody(tray.body);
 
-  const scene = renderData ? new THREE.Scene() : undefined;
+  const scene = assets ? new THREE.Scene() : undefined;
+
   const cubesGroup = scene ? new THREE.Group() : undefined;
   const cubes: CubeData[] = [];
 
   for (let i = 0; i < cubesQty; i++) {
     const cubeData = createCube(
       calcCubePosition(cubesQty, i),
-      renderData?.textures
+      assets ?? undefined
     );
     cubes.push(cubeData);
     world.addBody(cubeData.body);
@@ -202,27 +250,25 @@ export function createScene(
   }
 
   const result: SceneData = { world, cubes, tray };
-  if (!renderData || !scene || !cubesGroup) return result;
+  if (!assets || !scene || !cubesGroup) return result;
 
   scene.background = null;
   scene.add(cubesGroup, tray.mesh!);
 
   const { w, h } = calcScreenSizes();
-  const camera =
-    oldSceneData?.camera ??
-    new THREE.PerspectiveCamera(getFovRange().max, w / h, 0.1, 1000);
-  if (!oldSceneData) camera.position.set(0, cubeSize * 15, cubeSize * 7.7);
 
-  const renderer =
-    oldSceneData?.renderer ??
-    new THREE.WebGLRenderer({
-      canvas: renderData.canvas,
-      antialias: true,
-      alpha: true,
-    });
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  const { renderer } = assets;
+  const camera = new THREE.PerspectiveCamera(
+    getFovRange().max,
+    w / h,
+    0.1,
+    1000
+  );
   renderer.setSize(w, h, false);
+
+  if (!oldSceneData) {
+    camera.position.set(0, cubeSize * 15, cubeSize * 7.7);
+  }
 
   oldSceneData?.controls.dispose();
 

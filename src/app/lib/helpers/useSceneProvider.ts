@@ -1,72 +1,74 @@
 import { RefObject, useCallback, useEffect, useRef, useState } from "react";
 import SceneProvider from "../SceneProvider";
-import { FaceIndex, ProviderStage, SceneTextures } from "../types";
-import { loadTextures } from "../utils";
+import { FaceIndex, ProviderStage, SceneAssets } from "../types";
+import { useAppDispatch, useAppSelector } from "@/app/store/hooks";
+import { setTargetValues } from "@/app/store/slices/diceSlice";
+import { loadAssets } from "../utils";
 
 export default function useSceneProvider(
   canvas: RefObject<HTMLCanvasElement | null>
 ) {
-  const [provider, setProvider] = useState<SceneProvider>();
-  const [targetValues, setTargetValues] = useState<FaceIndex[]>([]);
-  const [stage, setStage] = useState<ProviderStage>("CONFIG");
-  const textures = useRef<SceneTextures>(null);
+  const targetValues = useAppSelector((state) => state.dice.targetValues);
+  const appDispatch = useAppDispatch();
+  const [stage, setStage] = useState<ProviderStage | "START">("START");
+  const assets = useRef<SceneAssets>(null);
+  const provider = useRef<SceneProvider>(null);
+  const isLoading = useRef(false);
 
   const initProvider = useCallback(async () => {
     if (canvas.current) {
-      if (!textures.current) {
-        textures.current = await loadTextures();
+      isLoading.current = true;
+      if (!assets.current) {
+        assets.current = await loadAssets(canvas.current);
       }
-      setProvider(
-        new SceneProvider(
-          canvas.current,
-          textures.current,
-          [6, 6, 6, 6, 6, 6],
-          ({ isLoading, isAnimation, isFinal, targetValues }) => {
-            const newStage: ProviderStage = isFinal
-              ? "FINAL"
-              : isAnimation
-              ? "ANIMATION"
-              : isLoading
-              ? "LOADING"
-              : "CONFIG";
+      provider.current = new SceneProvider(
+        assets.current,
+        targetValues,
+        (data) => {
+          const newStage: ProviderStage = data.isFinal
+            ? "FINAL"
+            : data.isAnimation
+            ? "ANIMATION"
+            : data.isLoading
+            ? "LOADING"
+            : "CONFIG";
 
-            setStage(newStage);
-            setTargetValues(targetValues);
-          }
-        )
+          setStage(newStage);
+          appDispatch(setTargetValues(data.targetValues));
+        }
       );
+      isLoading.current = false;
     }
-  }, [canvas]);
+  }, [appDispatch, canvas, targetValues]);
 
   useEffect(() => {
-    if (!provider) {
+    if (!provider.current && !isLoading.current) {
       initProvider();
     }
-  }, [provider, initProvider]);
+  }, [initProvider]);
 
   useEffect(() => {
     const resizeHandler = () => {
-      provider?.syncSizes();
+      provider.current?.syncSizes();
     };
 
     window.addEventListener("resize", resizeHandler);
     return () => {
       window.removeEventListener("resize", resizeHandler);
     };
-  }, [provider]);
+  }, []);
 
   return {
-    provider,
     targetValues,
     stage,
     setTargetValues: (value: FaceIndex[]) => {
-      provider?.setData({ targetValues: value });
+      provider.current?.setData({ targetValues: value });
     },
     start: () => {
-      provider?.start();
+      provider.current?.start();
     },
     reset: () => {
-      provider?.reset();
+      provider.current?.reset();
     },
   };
 }

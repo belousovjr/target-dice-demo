@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import CANNON from "cannon";
 import { Quaternion, SceneProviderData } from "./types";
+import { genTrayGeometric } from "./tray-geo";
 
 export const faceVectors = {
   1: new THREE.Vector3(0, 1, 0), //top
@@ -73,3 +74,5 @@ export const diceGroundContact = new CANNON.ContactMaterial(
 export const boxShape = new CANNON.Box(
   new CANNON.Vec3(cubeSize / 2, cubeSize / 2, cubeSize / 2)
 );
+
+export const trayGeo = genTrayGeometric();
