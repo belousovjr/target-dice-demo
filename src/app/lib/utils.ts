@@ -8,39 +8,33 @@ import {
   RollReadyState,
   SceneData,
   SceneDataForRender,
+  SceneTextures,
   Vector3,
 } from "./types";
 import {
+  boxShape,
   cubeDefaultY,
   cubeMaterialsNumbers,
   cubeOffset,
   cubeSize,
-  displayHeight,
-  displayWidth,
+  diceGroundContact,
+  diceMaterial,
   faceVectors,
   loadingRotateStep,
+  maxDisplayWidth,
+  maxDistance,
+  minDistance,
   restConfirmations,
+  stepsConfirmations,
+  trayMaterial,
+  traySizes,
 } from "./constants";
-
-export function createDiceMaterial(number: number) {
-  const size = 256;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d")!;
-
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, size, size);
-
-  ctx.fillStyle = "#000000";
-  ctx.font = "bold 150px Arial";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(number.toString(), size / 2, size / 2);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  return new THREE.MeshStandardMaterial({ map: texture });
-}
+import {
+  BufferGeometryUtils,
+  OrbitControls,
+} from "three/examples/jsm/Addons.js";
+import createDiceTextures from "dice-textures";
+import { genTrayGeometric } from "./tray-geo";
 
 export function syncMesh(cubeData: CubeDataForRender) {
   cubeData.mesh.position.copy(cubeData.body.position);
@@ -51,139 +45,224 @@ export function calcCubePosition(cubesQty: number, cubeIndex: number): Vector3 {
   return [(cubeIndex - (cubesQty - 1) / 2) * cubeOffset, cubeDefaultY, 0];
 }
 
-export function createCube<
-  T extends boolean,
-  R = T extends true ? CubeDataForRender : CubeData
->(position: Vector3, withMesh: T): R {
-  const diceMaterial = new CANNON.Material("dice");
-  diceMaterial.friction = 0.4;
-  diceMaterial.restitution = 0.25;
+export async function loadTextures(): Promise<SceneTextures> {
+  const loader = new THREE.TextureLoader();
+
+  const [albedo, ao, normal, ...dice] = await Promise.all([
+    ...[
+      "/polystyrene/rough-polystyrene_albedo.png",
+      "/polystyrene/rough-polystyrene_ao.png",
+      "/polystyrene/rough-polystyrene_normal-ogl.png",
+      ...createDiceTextures(
+        { size: 100, color: "white", pipColor: "black" },
+        { quality: 1 }
+      ),
+    ].map(
+      (item) =>
+        new Promise<THREE.Texture>((resolve) => {
+          loader.load(item, resolve);
+        })
+    ),
+  ]);
+
+  return { tray: { albedo, ao, normal }, dice };
+}
+
+function createTray(textures?: SceneTextures) {
+  const geometriesData = genTrayGeometric();
+  const prepGeometry = geometriesData.map(
+    ([size, pos, rot]) =>
+      new THREE.Mesh(
+        new THREE.BoxGeometry(...size).rotateY(rot ?? 0).translate(...pos)
+      )
+  );
 
   const body = new CANNON.Body({
-    mass: 0.005,
-    shape: new CANNON.Box(
-      new CANNON.Vec3(cubeSize / 2, cubeSize / 2, cubeSize / 2)
+    mass: 0,
+    material: trayMaterial,
+  });
+
+  for (const [size, pos, rot = 0] of geometriesData) {
+    const shape = new CANNON.Box(
+      new CANNON.Vec3(...(size as [number, number, number]).map((v) => v / 2))
+    );
+
+    const shapeQuat = new CANNON.Quaternion();
+    shapeQuat.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), rot as number);
+
+    body.addShape(
+      shape,
+      new CANNON.Vec3(...(pos as [number, number, number])),
+      shapeQuat
+    );
+  }
+
+  if (!textures) {
+    return { body };
+  }
+
+  const unitedGeometry = BufferGeometryUtils.mergeVertices(
+    BufferGeometryUtils.mergeGeometries(
+      prepGeometry.map((m) => m.geometry),
+      false
     ),
+    0.001
+  );
+
+  const { albedo, ao, normal } = textures.tray;
+
+  const mesh = new THREE.Mesh(
+    unitedGeometry,
+    new THREE.MeshStandardMaterial({
+      color: 0x1e5eff,
+      map: albedo,
+      aoMap: ao,
+      normalMap: normal,
+    })
+  );
+
+  mesh.receiveShadow = true;
+  mesh.castShadow = true;
+
+  return { mesh, body };
+}
+
+export function createCube(position: Vector3, textures?: SceneTextures) {
+  const body = new CANNON.Body({
+    mass: 1,
+    shape: boxShape,
     position: new CANNON.Vec3(...position),
     material: diceMaterial,
   });
-  body.linearDamping = 0.08;
-  body.angularDamping = 0.12;
+  body.linearDamping = 0.01;
+  body.angularDamping = 0.1;
 
   let mesh: THREE.Mesh | undefined;
 
-  if (withMesh) {
+  if (textures) {
     const cubeGeo = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
-    const cubeMat = cubeMaterialsNumbers.map(createDiceMaterial);
-    mesh = new THREE.Mesh(cubeGeo, cubeMat);
+    cubeGeo.computeVertexNormals();
 
-    const cubeData = { body, mesh } as R;
+    const mat = cubeMaterialsNumbers.map((index) => {
+      const map = textures.dice[index - 1];
+      return new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        map: map,
+      });
+    });
+
+    mesh = new THREE.Mesh(cubeGeo, mat);
+    mesh.receiveShadow = true;
+    mesh.castShadow = true;
+
+    const cubeData = { body, mesh };
 
     syncMesh(cubeData as CubeDataForRender);
 
     return cubeData;
+  } else {
+    return { body, mesh: undefined };
   }
-  return { body } as R;
 }
 
-export function createScene<
-  T extends HTMLCanvasElement | null,
-  S = T extends null ? SceneData : SceneDataForRender,
-  C = T extends null ? CubeData : CubeDataForRender
->(cubesQty: number, canvas: T): S {
+export function createScene(
+  cubesQty: number,
+  renderData: null,
+  oldSceneData?: SceneDataForRender
+): SceneData;
+export function createScene(
+  cubesQty: number,
+  renderData: { canvas: HTMLCanvasElement; textures: SceneTextures },
+  oldSceneData?: SceneDataForRender
+): SceneDataForRender;
+export function createScene(
+  cubesQty: number,
+  renderData: { canvas: HTMLCanvasElement; textures: SceneTextures } | null,
+  oldSceneData?: SceneDataForRender
+): SceneData | SceneDataForRender {
   const world = new CANNON.World();
   world.gravity.set(0, 0, 0);
+  world.addContactMaterial(diceGroundContact);
 
-  const scene = !!canvas && new THREE.Scene();
+  const tray = oldSceneData?.tray ?? createTray(renderData?.textures);
+  world.addBody(tray.body);
 
-  const cubesGroup = !!canvas && new THREE.Group();
-  if (scene && cubesGroup) {
-    scene.add(cubesGroup);
-  }
-
-  const groundBody = new CANNON.Body({
-    mass: 0,
-    shape: new CANNON.Box(new CANNON.Vec3(50, 0.5, 50)),
-    position: new CANNON.Vec3(0, -0.5, 0),
-  });
-  world.addBody(groundBody);
-
-  const cubes: C[] = [];
+  const scene = renderData ? new THREE.Scene() : undefined;
+  const cubesGroup = scene ? new THREE.Group() : undefined;
+  const cubes: CubeData[] = [];
 
   for (let i = 0; i < cubesQty; i++) {
-    const cubePosition = calcCubePosition(cubesQty, i);
-
-    const cubeData = createCube(cubePosition, !!canvas);
-    cubes.push(cubeData as C);
-
-    world.addBody(cubeData.body);
-
-    if (cubesGroup) {
-      cubesGroup.add((cubeData as CubeDataForRender).mesh!);
-    }
-  }
-
-  const result = {
-    world,
-    cubes,
-  };
-
-  if (scene) {
-    scene.background = new THREE.Color(0xaaaaaa);
-
-    const camera = new THREE.PerspectiveCamera(
-      85,
-      displayWidth / displayHeight,
-      0.1,
-      1000
+    const cubeData = createCube(
+      calcCubePosition(cubesQty, i),
+      renderData?.textures
     );
-    camera.position.set(0, 10, 8);
-
-    const renderer = new THREE.WebGLRenderer({
-      canvas: canvas,
-      antialias: true,
-    });
-
-    renderer.setSize(displayWidth, displayHeight, false);
-
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(5, 10, 7.5);
-    scene.add(light);
-
-    const groundGeo = new THREE.BoxGeometry(100, 1, 100);
-    const groundMat = new THREE.MeshStandardMaterial({
-      color: 0xff0000,
-    });
-    const groundMesh = new THREE.Mesh(groundGeo, groundMat);
-
-    groundMesh.position.copy(groundBody.position);
-    scene.add(groundMesh);
-
-    return {
-      ...result,
-      scene,
-      renderer,
-      camera,
-      cubesGroup,
-    } as S;
+    cubes.push(cubeData);
+    world.addBody(cubeData.body);
+    cubesGroup?.add((cubeData as CubeDataForRender).mesh!);
   }
 
-  return result as S;
-}
+  const result: SceneData = { world, cubes, tray };
+  if (!renderData || !scene || !cubesGroup) return result;
 
-export function lookAtCamera(
-  camera: THREE.Camera,
-  target: THREE.Object3D,
-  lookTarget: THREE.Vector3
-) {
-  const box = new THREE.Box3().setFromObject(target);
-  const center = new THREE.Vector3();
-  box.getCenter(center);
-  const targetCenter = new THREE.Vector3(0, center.y, 0);
+  scene.background = null;
+  scene.add(cubesGroup, tray.mesh!);
 
-  lookTarget.lerp(targetCenter, 0.1);
+  const { w, h } = calcScreenSizes();
+  const camera =
+    oldSceneData?.camera ??
+    new THREE.PerspectiveCamera(getFovRange().max, w / h, 0.1, 1000);
+  if (!oldSceneData) camera.position.set(0, cubeSize * 15, cubeSize * 7.7);
 
-  camera.lookAt(lookTarget);
+  const renderer =
+    oldSceneData?.renderer ??
+    new THREE.WebGLRenderer({
+      canvas: renderData.canvas,
+      antialias: true,
+      alpha: true,
+    });
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.setSize(w, h, false);
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  Object.assign(controls, {
+    enableDamping: true,
+    dampingFactor: 0.05,
+    enablePan: false,
+    enableZoom: true,
+    maxPolarAngle: Math.PI / 2 - 0.4,
+    minDistance,
+    maxDistance,
+  });
+
+  if (oldSceneData) {
+    controls.target.copy(oldSceneData.controls.target);
+    camera.position.copy(oldSceneData.camera.position);
+    camera.quaternion.copy(oldSceneData.camera.quaternion);
+    camera.fov = oldSceneData.camera.fov;
+    camera.updateProjectionMatrix();
+    oldSceneData.controls.dispose();
+  }
+  controls.update();
+
+  const light = new THREE.DirectionalLight(0xffffff, 0.9);
+  Object.assign(light.position, {
+    x: cubeSize * 8,
+    y: cubeSize * 20,
+    z: -cubeSize * 4,
+  });
+  light.castShadow = true;
+  light.shadow.blurSamples = 20;
+  Object.assign(light.shadow.camera, {
+    left: -traySizes.x,
+    right: traySizes.x,
+    top: traySizes.x,
+    bottom: -traySizes.x,
+  });
+  light.shadow.mapSize.width = light.shadow.mapSize.height = 2048;
+  scene.add(light, new THREE.AmbientLight(0xffffff, 0.1));
+
+  return { ...result, scene, renderer, camera, cubesGroup, controls };
 }
 
 export function moveBodyTowards(
@@ -194,19 +273,14 @@ export function moveBodyTowards(
 ): { vector: Vector3; isDone: boolean } {
   const pos = new CANNON.Vec3(...posV);
   const target = new CANNON.Vec3(...targetV);
-
   const delta = target.vsub(pos);
   const dist = delta.length();
-
   if (dist < minDelta) {
     return { vector: targetV, isDone: true };
   }
-
   const dir = delta.scale(1 / dist);
   const offset = dir.scale(Math.min(step, dist));
-
   pos.vadd(offset, pos);
-
   return {
     vector: pos.toArray() as Vector3,
     isDone: false,
@@ -216,23 +290,20 @@ export function moveBodyTowards(
 export function rotateBodyTowards(
   rotateV: Quaternion,
   targetV: Quaternion,
-  threshold = 0.001,
-  step = 0.05
+  step = 0.08,
+  threshold = 0.001
 ): { quant: Quaternion; isDone: boolean } {
   const rotate = new THREE.Quaternion(...rotateV);
   const target = new THREE.Quaternion(...targetV);
   const angle = rotate.angleTo(target);
-
   if (angle < threshold) {
     return {
       quant: targetV,
       isDone: true,
     };
   }
-
   rotate.slerp(target, step);
   rotate.normalize();
-
   return {
     quant: rotate.toArray(),
     isDone: false,
@@ -261,8 +332,10 @@ export function getRandomVector3() {
 export function genRollReadyState(): RollReadyState {
   const v: Vector3 = getRandomVector3();
   const angleVelocity = v.map((item) => item * 8) as Vector3;
-  const velocity = v.map((item) => item * 0.01) as Vector3;
-  velocity[1] += 0.065;
+  const velocity = v.map(
+    (item) => item * 0.4 + Math.sign(item) * 0.2
+  ) as Vector3;
+  velocity[1] = 8 + 4 * Math.random();
   return {
     rotate: getRandomQuaternion(),
     angleVelocity,
@@ -285,14 +358,10 @@ export function calcLoadingStep(
         )
       )
     );
-  // .normalize();
-
   const angle = 2 * Math.acos(Math.min(Math.max(quant.w, -1), 1));
-
   const isStartPosition =
     loadingQuant.w !== 1 &&
     Math.min(Math.abs(Math.PI * 2 - angle), angle) < loadingRotateStep;
-
   return {
     quant,
     isStartPosition,
@@ -311,14 +380,19 @@ export function getFaceRotationQuant(from: FaceIndex, to: FaceIndex) {
 
 export function getRestChecker(sceneData: SceneData) {
   let finalConfirmation = 0;
+  let steps = 0;
   return () => {
     const sumVelocity = sceneData.cubes.reduce(
       (res, { body }) =>
         res + body.velocity.length() + body.angularVelocity.length(),
       0
     );
+    steps++;
 
-    if (sumVelocity / sceneData.cubes.length < 0.01) {
+    if (
+      steps >= stepsConfirmations ||
+      sumVelocity / sceneData.cubes.length < 0.01
+    ) {
       finalConfirmation++;
       if (finalConfirmation >= restConfirmations) {
         return true;
@@ -348,4 +422,37 @@ export function applyRollReadyStates(
       cubeData.body.position.clone()
     );
   }
+}
+
+export function calcTarget(target: THREE.Object3D, lookTarget?: THREE.Vector3) {
+  const box = new THREE.Box3().setFromObject(target);
+  const center = new THREE.Vector3();
+  box.getCenter(center);
+  const targetCenter = new THREE.Vector3(0, center.y, 0);
+
+  return lookTarget ? lookTarget.clone().lerp(targetCenter, 0.1) : targetCenter;
+}
+
+export function calcFov(camera: THREE.PerspectiveCamera, sign: -1 | 1) {
+  const { max, min } = getFovRange();
+  const finValue = sign > 0 ? max : min;
+  if (camera.fov !== finValue) {
+    camera.fov += sign * 0.025;
+    if (Math.sign(finValue - camera.fov) !== sign) {
+      camera.fov = finValue;
+    }
+    camera.updateProjectionMatrix();
+  }
+}
+
+export function calcScreenSizes() {
+  const factor = window.innerHeight / window.innerWidth;
+  const w = Math.min(maxDisplayWidth, window.innerWidth);
+  const h = factor * w;
+  return { w, h };
+}
+
+export function getFovRange() {
+  const max = 20 / (window.innerWidth / window.innerHeight) + 60;
+  return { max, min: max - 15 };
 }
