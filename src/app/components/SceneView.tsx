@@ -4,7 +4,7 @@ import { useRef } from "react";
 import useSceneProvider from "../lib/helpers/useSceneProvider";
 import { FaceIndex } from "../lib/types";
 
-export default function Scene() {
+export default function SceneView() {
   const canvas = useRef<HTMLCanvasElement>(null);
   const { provider, targetValues, stage, setTargetValues, start, reset } =
     useSceneProvider(canvas);
