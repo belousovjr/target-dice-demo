@@ -1,5 +1,5 @@
-import { makeSimulation } from "./simulation";
-import { RollReadyState } from "./types";
+import { makeSimulation } from "../simulation";
+import { RollReadyState } from "../types";
 
 self.onmessage = function (
   event: MessageEvent<{
