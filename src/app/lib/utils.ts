@@ -416,7 +416,7 @@ export function calcLoadingStep(
 }
 
 export function compareArrays<T>(a: T[], b: T[]) {
-  return JSON.stringify(a) === JSON.stringify(b);
+  return a.length === b.length && JSON.stringify(a) === JSON.stringify(b);
 }
 
 export function getFaceRotationQuant(from: FaceIndex, to: FaceIndex) {

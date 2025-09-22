@@ -26,7 +26,7 @@ export default function SceneView() {
     <>
       {stage !== "START" && (
         <div className="fixed flex justify-center z-10 w-full pointer-events-none">
-          <div className="ml-auto lg:mr-auto px-1 pt-1 flex items-start justify-end gap-1 w-85 pointer-events-auto">
+          <div className="ml-auto lg:mr-auto px-1 pt-1 flex items-start justify-end gap-1 w-81 pointer-events-auto">
             {targetValues.map((item, i) => (
               <div key={i}>
                 <Textfield
@@ -38,16 +38,23 @@ export default function SceneView() {
                     (e.target as HTMLInputElement).setSelectionRange(0, 1);
                   }}
                   onKeyDown={(e) => {
-                    const value = Number(e.key) as FaceIndex;
-                    if (!isNaN(value) && value > 0 && value <= 6) {
-                      const newTargetValues = [...targetValues];
-                      newTargetValues[i] = value;
-                      setTargetValues(newTargetValues);
-                    } else {
-                      setNotification?.({
-                        text: "Only numbers from 1 to 6 are allowed",
-                        variant: "alert",
-                      });
+                    if (
+                      e.key.length === 1 &&
+                      !e.ctrlKey &&
+                      !e.shiftKey &&
+                      !e.altKey
+                    ) {
+                      const value = Number(e.key) as FaceIndex;
+                      if (!isNaN(value) && value > 0 && value <= 6) {
+                        const newTargetValues = [...targetValues];
+                        newTargetValues[i] = value;
+                        setTargetValues(newTargetValues);
+                      } else {
+                        setNotification?.({
+                          text: "Only numbers from 1 to 6 are allowed",
+                          variant: "alert",
+                        });
+                      }
                     }
                   }}
                   className="text-center w-9 px-0"
@@ -55,6 +62,7 @@ export default function SceneView() {
                   size="sm"
                   autoFocus
                   onFocus={(e) => e.target.select()}
+                  inputMode="decimal"
                 />
                 {stage === "CONFIG" && targetValues.length > 1 && (
                   <Button
@@ -71,16 +79,15 @@ export default function SceneView() {
                 )}
               </div>
             ))}
-            {targetValues.length < 6 && (
-              <Button
-                onClick={() => {
-                  setTargetValues([...targetValues, 1]);
-                }}
-                icon={<PlusIcon />}
-                size="sm"
-                disabled={stage !== "CONFIG"}
-              />
-            )}
+            <Button
+              onClick={() => {
+                setTargetValues([...targetValues, 1]);
+              }}
+              icon={<PlusIcon />}
+              size="sm"
+              disabled={stage !== "CONFIG" || targetValues.length >= 6}
+              variant="secondary"
+            />
             {stage === "CONFIG" ? (
               <Button onClick={start} icon={<PlayIcon />} size="sm" />
             ) : (
