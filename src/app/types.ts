@@ -1,7 +1,9 @@
 import CANNON from "cannon";
 import * as THREE from "three";
-import { faceVectors } from "./constants";
+import { faceVectors } from "./lib/constants";
 import { OrbitControls } from "three/examples/jsm/Addons.js";
+import { ComponentProps } from "react";
+import { Notification } from "@belousovjr/uikit";
 
 export type FaceIndex = keyof typeof faceVectors;
 
@@ -71,11 +73,14 @@ export interface FaceRotationData {
 
 export type ProviderStage = "CONFIG" | "LOADING" | "ANIMATION" | "FINAL";
 
-export interface SceneTextures {
-  tray: {
-    albedo: THREE.Texture;
-    ao: THREE.Texture;
-    normal: THREE.Texture;
-  };
-  dice: THREE.Texture[];
+export interface SceneAssets {
+  tray: THREE.Mesh;
+  dice: THREE.Mesh;
+  renderer: THREE.WebGLRenderer;
+}
+
+export interface SnackbarData {
+  text: string;
+  variant?: ComponentProps<typeof Notification>["variant"];
+  timestamp: number;
 }

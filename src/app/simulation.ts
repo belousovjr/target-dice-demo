@@ -1,7 +1,7 @@
 import CANNON from "cannon";
 import { FaceIndex, FaceIndexData, RollReadyState } from "./types";
-import { applyRollReadyStates, createScene, getRestChecker } from "./utils";
-import { faceVectors, gravitationValue } from "./constants";
+import { applyRollReadyStates, createScene, getRestChecker } from "./lib/utils";
+import { faceVectors, gravitationValue } from "./lib/constants";
 
 export function getTopFaceIndex(quaternion: CANNON.Quaternion) {
   const up = new CANNON.Vec3(0, 1, 0);

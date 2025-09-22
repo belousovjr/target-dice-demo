@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@belousovjr/uikit": "^0.2.1",
+    "@reduxjs/toolkit": "^2.9.0",
     "@types/cannon": "^0.1.13",
     "@types/three": "^0.179.0",
     "cannon": "^0.6.2",
@@ -16,6 +18,8 @@
     "next": "15.5.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "react-redux": "^9.2.0",
+    "redux-persist": "^6.0.0",
     "three": "^0.179.1"
   },
   "devDependencies": {
