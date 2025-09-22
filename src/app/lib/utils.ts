@@ -224,6 +224,8 @@ export function createScene(
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.setSize(w, h, false);
 
+  oldSceneData?.controls.dispose();
+
   const controls = new OrbitControls(camera, renderer.domElement);
   Object.assign(controls, {
     enableDamping: true,
@@ -241,11 +243,10 @@ export function createScene(
     camera.quaternion.copy(oldSceneData.camera.quaternion);
     camera.fov = oldSceneData.camera.fov;
     camera.updateProjectionMatrix();
-    oldSceneData.controls.dispose();
   }
   controls.update();
 
-  const light = new THREE.DirectionalLight(0xffffff, 0.9);
+  const light = new THREE.DirectionalLight(0xffffff, 1);
   Object.assign(light.position, {
     x: cubeSize * 8,
     y: cubeSize * 20,

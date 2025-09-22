@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@belousovjr/uikit": "^0.2.1",
     "@types/cannon": "^0.1.13",
     "@types/three": "^0.179.0",
     "cannon": "^0.6.2",
