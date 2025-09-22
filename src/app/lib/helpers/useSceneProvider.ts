@@ -1,6 +1,7 @@
-import { RefObject, useEffect, useState } from "react";
+import { RefObject, useCallback, useEffect, useRef, useState } from "react";
 import SceneProvider from "../SceneProvider";
-import { FaceIndex, ProviderStage } from "../types";
+import { FaceIndex, ProviderStage, SceneTextures } from "../types";
+import { loadTextures } from "../utils";
 
 export default function useSceneProvider(
   canvas: RefObject<HTMLCanvasElement | null>
@@ -8,13 +9,18 @@ export default function useSceneProvider(
   const [provider, setProvider] = useState<SceneProvider>();
   const [targetValues, setTargetValues] = useState<FaceIndex[]>([]);
   const [stage, setStage] = useState<ProviderStage>("CONFIG");
+  const textures = useRef<SceneTextures>(null);
 
-  useEffect(() => {
-    if (!provider && canvas.current) {
+  const initProvider = useCallback(async () => {
+    if (canvas.current) {
+      if (!textures.current) {
+        textures.current = await loadTextures();
+      }
       setProvider(
         new SceneProvider(
           canvas.current,
-          [1],
+          textures.current,
+          [6, 6, 6, 6, 6, 6],
           ({ isLoading, isAnimation, isFinal, targetValues }) => {
             const newStage: ProviderStage = isFinal
               ? "FINAL"
@@ -30,7 +36,13 @@ export default function useSceneProvider(
         )
       );
     }
-  }, [canvas, provider]);
+  }, [canvas]);
+
+  useEffect(() => {
+    if (!provider) {
+      initProvider();
+    }
+  }, [provider, initProvider]);
 
   useEffect(() => {
     const resizeHandler = () => {

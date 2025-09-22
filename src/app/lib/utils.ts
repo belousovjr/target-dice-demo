@@ -8,13 +8,17 @@ import {
   RollReadyState,
   SceneData,
   SceneDataForRender,
+  SceneTextures,
   Vector3,
 } from "./types";
 import {
+  boxShape,
   cubeDefaultY,
   cubeMaterialsNumbers,
   cubeOffset,
   cubeSize,
+  diceGroundContact,
+  diceMaterial,
   faceVectors,
   loadingRotateStep,
   maxDisplayWidth,
@@ -22,32 +26,15 @@ import {
   minDistance,
   restConfirmations,
   stepsConfirmations,
+  trayMaterial,
   traySizes,
 } from "./constants";
 import {
   BufferGeometryUtils,
   OrbitControls,
 } from "three/examples/jsm/Addons.js";
-
-export function createDiceMaterial(number: number) {
-  const size = 256;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d")!;
-
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, size, size);
-
-  ctx.fillStyle = "#000000";
-  ctx.font = "bold 150px Arial";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(number.toString(), size / 2, size / 2);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  return new THREE.MeshStandardMaterial({ map: texture });
-}
+import createDiceTextures from "dice-textures";
+import { genTrayGeometric } from "./tray-geo";
 
 export function syncMesh(cubeData: CubeDataForRender) {
   cubeData.mesh.position.copy(cubeData.body.position);
@@ -58,235 +45,36 @@ export function calcCubePosition(cubesQty: number, cubeIndex: number): Vector3 {
   return [(cubeIndex - (cubesQty - 1) / 2) * cubeOffset, cubeDefaultY, 0];
 }
 
-const trayMaterial = new CANNON.Material("ground");
+export async function loadTextures(): Promise<SceneTextures> {
+  const loader = new THREE.TextureLoader();
 
-const diceMaterial = new CANNON.Material("dice");
+  const [albedo, ao, normal, ...dice] = await Promise.all([
+    ...[
+      "/polystyrene/rough-polystyrene_albedo.png",
+      "/polystyrene/rough-polystyrene_ao.png",
+      "/polystyrene/rough-polystyrene_normal-ogl.png",
+      ...createDiceTextures(
+        { size: 100, color: "white", pipColor: "black" },
+        { quality: 1 }
+      ),
+    ].map(
+      (item) =>
+        new Promise<THREE.Texture>((resolve) => {
+          loader.load(item, resolve);
+        })
+    ),
+  ]);
 
-const diceGroundContact = new CANNON.ContactMaterial(
-  diceMaterial,
-  trayMaterial,
-  {
-    friction: 0.2,
-    restitution: 0.4,
-  }
-);
+  return { tray: { albedo, ao, normal }, dice };
+}
 
-const boxShape = new CANNON.Box(
-  new CANNON.Vec3(cubeSize / 2, cubeSize / 2, cubeSize / 2)
-);
-
-function createTray() {
-  const sizes = traySizes;
-  const width = cubeSize * 0.3;
-  const chamfer = width * 10;
-
-  const legSize = chamfer / Math.SQRT2;
-
-  const halfX = sizes.x / 2;
-  const halfY = sizes.y / 2;
-  const halfZ = sizes.z / 2;
-
-  const midY = width / 2;
-  const topY = sizes.y - width / 2;
-
-  const chamferCut = chamfer - width * Math.SQRT2;
-  const offset = (width * (Math.SQRT2 + 1)) / 4;
-
-  const geometriesData = [
-    // floor
-    [
-      [sizes.x - legSize * 2, width, sizes.z],
-      [0, midY, 0],
-    ],
-    [
-      [legSize, width, sizes.z - legSize * 2],
-      [-halfX + legSize / 2, midY, 0],
-    ],
-    [
-      [legSize, width, sizes.z - legSize * 2],
-      [halfX - legSize / 2, midY, 0],
-    ],
-    [
-      [chamfer, width, chamfer],
-      [-halfX + legSize, midY, -halfZ + legSize],
-      Math.PI / 4,
-    ],
-    [
-      [chamfer, width, chamfer],
-      [-halfX + legSize, midY, halfZ - legSize],
-      Math.PI / 4,
-    ],
-    [
-      [chamfer, width, chamfer],
-      [halfX - legSize, midY, -halfZ + legSize],
-      Math.PI / 4,
-    ],
-    [
-      [chamfer, width, chamfer],
-      [halfX - legSize, midY, halfZ - legSize],
-      Math.PI / 4,
-    ],
-
-    // second layer
-    [
-      [width * 2, width, sizes.z - legSize * 2],
-      [-halfX + width * 2, midY + width, 0],
-    ],
-    [
-      [sizes.x - legSize * 2, width, width * 2],
-      [0, midY + width, -halfZ + width * 2],
-    ],
-    [
-      [width * 2, width, chamferCut],
-      [
-        -halfX + legSize / 2 + width / Math.SQRT2 + width / 2,
-        midY + width,
-        halfZ - (legSize / 2 + width / Math.SQRT2 + width / 2),
-      ],
-      Math.PI / 4,
-    ],
-    [
-      [width * 2, width, chamferCut],
-      [
-        -halfX + legSize / 2 + width / Math.SQRT2 + width / 2,
-        midY + width,
-        -halfZ + legSize / 2 + width / Math.SQRT2 + width / 2,
-      ],
-      -Math.PI / 4,
-    ],
-    [
-      [width * 2, width, sizes.z - legSize * 2],
-      [halfX - width * 2, midY + width, 0],
-    ],
-    [
-      [sizes.x - legSize * 2, width, width * 2],
-      [0, midY + width, halfZ - width * 2],
-    ],
-    [
-      [width * 2, width, chamferCut],
-      [
-        halfX - (legSize / 2 + width / Math.SQRT2 + width / 2),
-        midY + width,
-        halfZ - (legSize / 2 + width / Math.SQRT2 + width / 2),
-      ],
-      -Math.PI / 4,
-    ],
-    [
-      [width * 2, width, chamferCut],
-      [
-        halfX - (legSize / 2 + width / Math.SQRT2 + width / 2),
-        midY + width,
-        -halfZ + legSize / 2 + width / Math.SQRT2 + width / 2,
-      ],
-      Math.PI / 4,
-    ],
-
-    // vertical walls
-    [
-      [width, sizes.y - width * 3, sizes.z - legSize * 2],
-      [-halfX + width * 1.5, midY + halfY, 0],
-    ],
-    [
-      [sizes.x - legSize * 2, sizes.y - width * 3, width],
-      [0, midY + halfY, -halfZ + width * 1.5],
-    ],
-    [
-      [width, sizes.y - width * 3, chamferCut],
-      [
-        -halfX + legSize / 2 + width / (2 * Math.SQRT2) + width / 2,
-        midY + halfY,
-        halfZ - (legSize / 2 + width / (2 * Math.SQRT2) + width / 2),
-      ],
-      Math.PI / 4,
-    ],
-    [
-      [width, sizes.y - width * 3, chamferCut],
-      [
-        -halfX + legSize / 2 + width / (2 * Math.SQRT2) + width / 2,
-        midY + halfY,
-        -halfZ + legSize / 2 + width / (2 * Math.SQRT2) + width / 2,
-      ],
-      -Math.PI / 4,
-    ],
-    [
-      [width, sizes.y - width * 3, sizes.z - legSize * 2],
-      [halfX - width * 1.5, midY + halfY, 0],
-    ],
-    [
-      [sizes.x - legSize * 2, sizes.y - width * 3, width],
-      [0, midY + halfY, halfZ - width * 1.5],
-    ],
-    [
-      [width, sizes.y - width * 3, chamferCut],
-      [
-        halfX - (legSize / 2 + width / (2 * Math.SQRT2) + width / 2),
-        midY + halfY,
-        halfZ - (legSize / 2 + width / (2 * Math.SQRT2) + width / 2),
-      ],
-      -Math.PI / 4,
-    ],
-    [
-      [width, sizes.y - width * 3, chamferCut],
-      [
-        halfX - (legSize / 2 + width / (2 * Math.SQRT2) + width / 2),
-        midY + halfY,
-        -halfZ + legSize / 2 + width / (2 * Math.SQRT2) + width / 2,
-      ],
-      Math.PI / 4,
-    ],
-
-    // top
-    [
-      [width * 2, width, sizes.z - legSize * 2],
-      [-halfX + width, topY, 0],
-    ],
-    [
-      [sizes.x - legSize * 2, width, width * 2],
-      [0, topY, -halfZ + width],
-    ],
-    [
-      [width * 2, width, sizes.z - legSize * 2],
-      [halfX - width, topY, 0],
-    ],
-    [
-      [sizes.x - legSize * 2, width, width * 2],
-      [0, topY, halfZ - width],
-    ],
-    [
-      [width * (1 + Math.SQRT2 - 1 / Math.SQRT2), width, chamfer],
-      [-halfX + legSize / 2 + offset, topY, halfZ - (legSize / 2 + offset)],
-      Math.PI / 4,
-    ],
-    [
-      [width * (1 + Math.SQRT2 - 1 / Math.SQRT2), width, chamfer],
-      [-halfX + legSize / 2 + offset, topY, -halfZ + (legSize / 2 + offset)],
-      -Math.PI / 4,
-    ],
-    [
-      [width * (1 + Math.SQRT2 - 1 / Math.SQRT2), width, chamfer],
-      [halfX - legSize / 2 - offset, topY, halfZ - (legSize / 2 + offset)],
-      -Math.PI / 4,
-    ],
-    [
-      [width * (1 + Math.SQRT2 - 1 / Math.SQRT2), width, chamfer],
-      [halfX - legSize / 2 - offset, topY, -halfZ + (legSize / 2 + offset)],
-      Math.PI / 4,
-    ],
-  ];
-
-  const prepGeometry = geometriesData.map(([size, pos, rot]) =>
-    new THREE.BoxGeometry(...(size as [number, number, number]))
-      .rotateY((rot ?? 0) as number)
-      .translate(...(pos as [number, number, number]))
-  );
-
-  const mergedGeometry = BufferGeometryUtils.mergeGeometries(prepGeometry);
-
-  const mesh = new THREE.Mesh(
-    mergedGeometry,
-    new THREE.MeshStandardMaterial({
-      color: 0xff0000,
-    })
+function createTray(textures?: SceneTextures) {
+  const geometriesData = genTrayGeometric();
+  const prepGeometry = geometriesData.map(
+    ([size, pos, rot]) =>
+      new THREE.Mesh(
+        new THREE.BoxGeometry(...size).rotateY(rot ?? 0).translate(...pos)
+      )
   );
 
   const body = new CANNON.Body({
@@ -309,13 +97,37 @@ function createTray() {
     );
   }
 
+  if (!textures) {
+    return { body };
+  }
+
+  const unitedGeometry = BufferGeometryUtils.mergeVertices(
+    BufferGeometryUtils.mergeGeometries(
+      prepGeometry.map((m) => m.geometry),
+      false
+    ),
+    0.001
+  );
+
+  const { albedo, ao, normal } = textures.tray;
+
+  const mesh = new THREE.Mesh(
+    unitedGeometry,
+    new THREE.MeshStandardMaterial({
+      color: 0x1e5eff,
+      map: albedo,
+      aoMap: ao,
+      normalMap: normal,
+    })
+  );
+
+  mesh.receiveShadow = true;
+  mesh.castShadow = true;
+
   return { mesh, body };
 }
 
-export function createCube<
-  T extends boolean,
-  R = T extends true ? CubeDataForRender : CubeData
->(position: Vector3, withMesh: T): R {
+export function createCube(position: Vector3, textures?: SceneTextures) {
   const body = new CANNON.Body({
     mass: 1,
     shape: boxShape,
@@ -327,123 +139,130 @@ export function createCube<
 
   let mesh: THREE.Mesh | undefined;
 
-  if (withMesh) {
+  if (textures) {
     const cubeGeo = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
-    const cubeMat = cubeMaterialsNumbers.map(createDiceMaterial);
-    mesh = new THREE.Mesh(cubeGeo, cubeMat);
+    cubeGeo.computeVertexNormals();
 
-    const cubeData = { body, mesh } as R;
+    const mat = cubeMaterialsNumbers.map((index) => {
+      const map = textures.dice[index - 1];
+      return new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        map: map,
+      });
+    });
+
+    mesh = new THREE.Mesh(cubeGeo, mat);
+    mesh.receiveShadow = true;
+    mesh.castShadow = true;
+
+    const cubeData = { body, mesh };
 
     syncMesh(cubeData as CubeDataForRender);
 
     return cubeData;
+  } else {
+    return { body, mesh: undefined };
   }
-  return { body } as R;
 }
 
-export function createScene(cubesQty: number, canvas: null): SceneData;
 export function createScene(
   cubesQty: number,
-  canvas: HTMLCanvasElement,
+  renderData: null,
+  oldSceneData?: SceneDataForRender
+): SceneData;
+export function createScene(
+  cubesQty: number,
+  renderData: { canvas: HTMLCanvasElement; textures: SceneTextures },
   oldSceneData?: SceneDataForRender
 ): SceneDataForRender;
 export function createScene(
   cubesQty: number,
-  canvas: HTMLCanvasElement | null,
+  renderData: { canvas: HTMLCanvasElement; textures: SceneTextures } | null,
   oldSceneData?: SceneDataForRender
 ): SceneData | SceneDataForRender {
   const world = new CANNON.World();
   world.gravity.set(0, 0, 0);
-
   world.addContactMaterial(diceGroundContact);
 
-  const scene = !!canvas && new THREE.Scene();
+  const tray = oldSceneData?.tray ?? createTray(renderData?.textures);
+  world.addBody(tray.body);
 
-  const { mesh: trayMesh, body: trayBody } = createTray();
-  world.addBody(trayBody);
-
-  const cubesGroup = !!canvas && new THREE.Group();
-
-  if (scene && cubesGroup) {
-    scene.add(cubesGroup);
-  }
-
+  const scene = renderData ? new THREE.Scene() : undefined;
+  const cubesGroup = scene ? new THREE.Group() : undefined;
   const cubes: CubeData[] = [];
 
   for (let i = 0; i < cubesQty; i++) {
-    const cubePosition = calcCubePosition(cubesQty, i);
-
-    const cubeData = createCube(cubePosition, !!canvas);
-    cubes.push(cubeData);
-
-    world.addBody(cubeData.body);
-
-    if (cubesGroup) {
-      cubesGroup.add((cubeData as CubeDataForRender).mesh!);
-    }
-  }
-
-  const result = {
-    world,
-    cubes,
-  };
-
-  if (scene && cubesGroup) {
-    scene.background = new THREE.Color(0xaaaaaa);
-
-    const { w, h } = calcScreenSizes();
-
-    const camera = new THREE.PerspectiveCamera(
-      getFovRange().max,
-      w / h,
-      0.1,
-      1000
+    const cubeData = createCube(
+      calcCubePosition(cubesQty, i),
+      renderData?.textures
     );
-    camera.position.set(0, cubeSize * 12, cubeSize * 10);
-
-    const renderer = new THREE.WebGLRenderer({
-      canvas: canvas,
-      antialias: true,
-    });
-
-    renderer.setSize(w, h, false);
-
-    const controls = new OrbitControls(camera, renderer.domElement);
-
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.enablePan = false;
-    controls.enableZoom = true;
-    controls.maxPolarAngle = Math.PI / 2 - 0.4;
-    controls.minDistance = minDistance;
-    controls.maxDistance = maxDistance;
-
-    if (oldSceneData) {
-      controls.target.copy(oldSceneData.controls.target.clone());
-      camera.position.copy(oldSceneData.camera.position.clone());
-      camera.quaternion.copy(oldSceneData.camera.quaternion.clone());
-      camera.fov = oldSceneData.camera.fov;
-      camera.updateProjectionMatrix();
-    }
-
-    controls.update();
-
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(5, 10, 7.5);
-    scene.add(light);
-    scene.add(trayMesh);
-
-    return {
-      ...result,
-      scene,
-      renderer,
-      camera,
-      cubesGroup,
-      controls,
-    };
+    cubes.push(cubeData);
+    world.addBody(cubeData.body);
+    cubesGroup?.add((cubeData as CubeDataForRender).mesh!);
   }
 
-  return result;
+  const result: SceneData = { world, cubes, tray };
+  if (!renderData || !scene || !cubesGroup) return result;
+
+  scene.background = null;
+  scene.add(cubesGroup, tray.mesh!);
+
+  const { w, h } = calcScreenSizes();
+  const camera =
+    oldSceneData?.camera ??
+    new THREE.PerspectiveCamera(getFovRange().max, w / h, 0.1, 1000);
+  if (!oldSceneData) camera.position.set(0, cubeSize * 15, cubeSize * 7.7);
+
+  const renderer =
+    oldSceneData?.renderer ??
+    new THREE.WebGLRenderer({
+      canvas: renderData.canvas,
+      antialias: true,
+      alpha: true,
+    });
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.setSize(w, h, false);
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  Object.assign(controls, {
+    enableDamping: true,
+    dampingFactor: 0.05,
+    enablePan: false,
+    enableZoom: true,
+    maxPolarAngle: Math.PI / 2 - 0.4,
+    minDistance,
+    maxDistance,
+  });
+
+  if (oldSceneData) {
+    controls.target.copy(oldSceneData.controls.target);
+    camera.position.copy(oldSceneData.camera.position);
+    camera.quaternion.copy(oldSceneData.camera.quaternion);
+    camera.fov = oldSceneData.camera.fov;
+    camera.updateProjectionMatrix();
+    oldSceneData.controls.dispose();
+  }
+  controls.update();
+
+  const light = new THREE.DirectionalLight(0xffffff, 0.9);
+  Object.assign(light.position, {
+    x: cubeSize * 8,
+    y: cubeSize * 20,
+    z: -cubeSize * 4,
+  });
+  light.castShadow = true;
+  light.shadow.blurSamples = 20;
+  Object.assign(light.shadow.camera, {
+    left: -traySizes.x,
+    right: traySizes.x,
+    top: traySizes.x,
+    bottom: -traySizes.x,
+  });
+  light.shadow.mapSize.width = light.shadow.mapSize.height = 2048;
+  scene.add(light, new THREE.AmbientLight(0xffffff, 0.1));
+
+  return { ...result, scene, renderer, camera, cubesGroup, controls };
 }
 
 export function moveBodyTowards(
@@ -454,19 +273,14 @@ export function moveBodyTowards(
 ): { vector: Vector3; isDone: boolean } {
   const pos = new CANNON.Vec3(...posV);
   const target = new CANNON.Vec3(...targetV);
-
   const delta = target.vsub(pos);
   const dist = delta.length();
-
   if (dist < minDelta) {
     return { vector: targetV, isDone: true };
   }
-
   const dir = delta.scale(1 / dist);
   const offset = dir.scale(Math.min(step, dist));
-
   pos.vadd(offset, pos);
-
   return {
     vector: pos.toArray() as Vector3,
     isDone: false,
@@ -482,17 +296,14 @@ export function rotateBodyTowards(
   const rotate = new THREE.Quaternion(...rotateV);
   const target = new THREE.Quaternion(...targetV);
   const angle = rotate.angleTo(target);
-
   if (angle < threshold) {
     return {
       quant: targetV,
       isDone: true,
     };
   }
-
   rotate.slerp(target, step);
   rotate.normalize();
-
   return {
     quant: rotate.toArray(),
     isDone: false,
@@ -522,7 +333,7 @@ export function genRollReadyState(): RollReadyState {
   const v: Vector3 = getRandomVector3();
   const angleVelocity = v.map((item) => item * 8) as Vector3;
   const velocity = v.map(
-    (item) => item * 0.5 + Math.sign(item) * 0.5
+    (item) => item * 0.4 + Math.sign(item) * 0.2
   ) as Vector3;
   velocity[1] = 8 + 4 * Math.random();
   return {
@@ -547,14 +358,10 @@ export function calcLoadingStep(
         )
       )
     );
-  // .normalize();
-
   const angle = 2 * Math.acos(Math.min(Math.max(quant.w, -1), 1));
-
   const isStartPosition =
     loadingQuant.w !== 1 &&
     Math.min(Math.abs(Math.PI * 2 - angle), angle) < loadingRotateStep;
-
   return {
     quant,
     isStartPosition,
@@ -630,7 +437,7 @@ export function calcFov(camera: THREE.PerspectiveCamera, sign: -1 | 1) {
   const { max, min } = getFovRange();
   const finValue = sign > 0 ? max : min;
   if (camera.fov !== finValue) {
-    camera.fov += sign * 0.03;
+    camera.fov += sign * 0.025;
     if (Math.sign(finValue - camera.fov) !== sign) {
       camera.fov = finValue;
     }
@@ -642,7 +449,6 @@ export function calcScreenSizes() {
   const factor = window.innerHeight / window.innerWidth;
   const w = Math.min(maxDisplayWidth, window.innerWidth);
   const h = factor * w;
-
   return { w, h };
 }
 

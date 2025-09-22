@@ -21,6 +21,9 @@ export interface CubeDataForRender extends CubeData {
 export interface SceneData {
   world: CANNON.World;
   cubes: CubeData[];
+  tray: {
+    body: CANNON.Body;
+  };
 }
 
 export interface SceneDataForRender extends SceneData {
@@ -30,6 +33,10 @@ export interface SceneDataForRender extends SceneData {
   cubes: CubeDataForRender[];
   cubesGroup: THREE.Group;
   controls: OrbitControls;
+  tray: {
+    body: CANNON.Body;
+    mesh: THREE.Mesh;
+  };
 }
 
 export type Vector3 = [number, number, number];
@@ -63,3 +70,12 @@ export interface FaceRotationData {
 }
 
 export type ProviderStage = "CONFIG" | "LOADING" | "ANIMATION" | "FINAL";
+
+export interface SceneTextures {
+  tray: {
+    albedo: THREE.Texture;
+    ao: THREE.Texture;
+    normal: THREE.Texture;
+  };
+  dice: THREE.Texture[];
+}
