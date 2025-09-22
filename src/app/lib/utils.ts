@@ -10,7 +10,7 @@ import {
   SceneData,
   SceneDataForRender,
   Vector3,
-} from "./types";
+} from "../types";
 import {
   boxShape,
   cubeDefaultY,

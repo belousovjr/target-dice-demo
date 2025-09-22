@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import CANNON from "cannon";
-import { Quaternion, SceneProviderData } from "./types";
+import { Quaternion, SceneProviderData } from "../types";
 import { genTrayGeometric } from "./tray-geo";
 
 export const faceVectors = {

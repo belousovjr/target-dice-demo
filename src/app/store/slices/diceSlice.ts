@@ -1,4 +1,4 @@
-import { FaceIndex } from "@/app/lib/types";
+import { FaceIndex } from "@/app/types";
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 interface TutorialState {

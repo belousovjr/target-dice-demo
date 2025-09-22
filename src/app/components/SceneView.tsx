@@ -2,15 +2,19 @@
 
 import { useEffect, useRef } from "react";
 import useSceneProvider from "../lib/helpers/useSceneProvider";
-import { FaceIndex } from "../lib/types";
+import { FaceIndex } from "../types";
 import { Button, Loader, Textfield } from "@belousovjr/uikit";
 import { PlusIcon, PlayIcon, RotateCcwIcon, XIcon } from "lucide-react";
+import useServiceContext from "../lib/helpers/useServiceContext";
+import Snackbar from "./Snackbar";
 
 export default function SceneView() {
   const canvas = useRef<HTMLCanvasElement>(null);
   const resetRef = useRef<HTMLButtonElement>(null);
   const { targetValues, stage, setTargetValues, start, reset } =
     useSceneProvider(canvas);
+
+  const { setNotification } = useServiceContext();
 
   useEffect(() => {
     if (stage === "FINAL") {
@@ -40,7 +44,10 @@ export default function SceneView() {
                       newTargetValues[i] = value;
                       setTargetValues(newTargetValues);
                     } else {
-                      console.log("SNACKB");
+                      setNotification?.({
+                        text: "Only numbers from 1 to 6 are allowed",
+                        variant: "alert",
+                      });
                     }
                   }}
                   className="text-center w-9 px-0"
@@ -97,6 +104,7 @@ export default function SceneView() {
         ref={canvas}
         className="fixed top-0 left-0 w-dvw max-h-dvh object-contain"
       />
+      <Snackbar />
     </>
   );
 }

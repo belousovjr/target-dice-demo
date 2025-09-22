@@ -11,7 +11,7 @@ import {
   SceneProviderData,
   SceneProviderDataUpdate,
   Vector3,
-} from "./types";
+} from "../types";
 import {
   applyRollReadyStates,
   calcCubePosition,

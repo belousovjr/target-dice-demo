@@ -1,6 +1,6 @@
 import { RefObject, useCallback, useEffect, useRef, useState } from "react";
 import SceneProvider from "../SceneProvider";
-import { FaceIndex, ProviderStage, SceneAssets } from "../types";
+import { FaceIndex, ProviderStage, SceneAssets } from "../../types";
 import { useAppDispatch, useAppSelector } from "@/app/store/hooks";
 import { setTargetValues } from "@/app/store/slices/diceSlice";
 import { loadAssets } from "../utils";
