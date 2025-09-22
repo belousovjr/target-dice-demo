@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import CANNON from "cannon";
 import { Quaternion, SceneProviderData } from "./types";
 
 export const faceVectors = {
@@ -19,9 +20,9 @@ export const cubeMaterialsNumbers = [
   2, // back
 ];
 
-export const cubeSize = 1;
+export const cubeSize = 0.7;
 export const cubeOffset = cubeSize * 2;
-export const cubeDefaultY = 5;
+export const cubeDefaultY = 1;
 
 export const defaultCubeRotateQ: Quaternion = [
   0.3535533905932738, 0.3535533905932738, 0.14644660940672624,
@@ -39,8 +40,36 @@ export const initialSceneProviderData: SceneProviderData = {
 export const loadingRotateStep = Math.PI / 20;
 
 export const restConfirmations = 50;
+export const stepsConfirmations = 750;
 
 export const gravitationValue = -9.82;
 
-export const displayWidth = 2048;
-export const displayHeight = 2048;
+export const maxDisplayWidth = 2048;
+
+export const minDistance = cubeSize * 10;
+export const maxDistance = cubeSize * 16;
+
+export const traySizes = new THREE.Vector3(
+  cubeSize * 22,
+  cubeSize * 3,
+  cubeSize * 12
+);
+export const trayWidth = 0.1;
+export const trayChamfer = 5;
+
+export const trayMaterial = new CANNON.Material("ground");
+
+export const diceMaterial = new CANNON.Material("dice");
+
+export const diceGroundContact = new CANNON.ContactMaterial(
+  diceMaterial,
+  trayMaterial,
+  {
+    friction: 0.2,
+    restitution: 0.4,
+  }
+);
+
+export const boxShape = new CANNON.Box(
+  new CANNON.Vec3(cubeSize / 2, cubeSize / 2, cubeSize / 2)
+);

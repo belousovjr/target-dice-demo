@@ -1,9 +1,5 @@
-import Scene from "./components/scene";
+import SceneView from "./components/SceneView";
 
 export default function Home() {
-  return (
-    <div>
-      <Scene />
-    </div>
-  );
+  return <SceneView />;
 }
