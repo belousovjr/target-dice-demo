@@ -146,8 +146,9 @@ export default class SceneProvider {
         const isFacesTargetPos =
           this.facesRotationData.length &&
           doneFacesRotQty === this.facesRotationData.length;
-        if (isFacesTargetPos && isLoadingStart && !this.targetStates.length)
+        if (isFacesTargetPos && isLoadingStart && !this.targetStates.length) {
           this.#makeRoll();
+        }
       }
     } else if (isAnimation) {
       this.setData({ isFinal: true });
@@ -233,6 +234,7 @@ export default class SceneProvider {
     }
 
     this.worker?.terminate();
+    this.worker = undefined;
 
     this.worker = new Worker(new URL("@/app/lib/worker.ts", import.meta.url), {
       type: "module",
@@ -293,7 +295,6 @@ export default class SceneProvider {
     this.loadingMeshesStates = [];
     this.facesRotationData = [];
     this.#restChecker = undefined;
-    this.worker = undefined;
 
     this.sceneData = createScene(
       this.data.targetValues.length,
