@@ -44,7 +44,7 @@ export default function SceneView() {
             <line x1="12" x2="12" y1="22" y2="12" />
           </svg>
           {stage !== "START" && (
-            <div className="flex items-start justify-end gap-0.5 md:gap-1 w-81">
+            <div className="flex items-start justify-end gap-0.5 md:gap-1">
               {targetValues.map((item, i) => (
                 <div key={i}>
                   <Textfield
