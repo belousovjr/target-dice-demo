@@ -48,7 +48,7 @@ export const gravitationValue = -9.82;
 export const maxDisplayWidth = 2048;
 
 export const minDistance = cubeSize * 10;
-export const maxDistance = cubeSize * 16;
+export const maxDistance = cubeSize * 18;
 
 export const traySizes = new THREE.Vector3(
   cubeSize * 22,

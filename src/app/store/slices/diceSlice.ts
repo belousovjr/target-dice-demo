@@ -6,7 +6,7 @@ interface TutorialState {
 }
 
 const initialState: TutorialState = {
-  targetValues: [6, 6, 6, 6, 6, 6],
+  targetValues: [6, 6],
 };
 
 const diceSlice = createSlice({
