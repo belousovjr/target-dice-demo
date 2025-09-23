@@ -25,8 +25,27 @@ export default function SceneView() {
   return (
     <>
       {stage !== "START" && (
-        <div className="fixed flex justify-center z-10 w-full pointer-events-none">
-          <div className="ml-auto lg:mr-auto px-1 pt-1 flex items-start justify-end gap-1 w-81 pointer-events-auto">
+        <div className="fixed flex items-start pt-1 md:pt-3.5 px-2 md:px-8 justify-center z-10 w-full pointer-events-none">
+          <div className="flex gap-5 items-center mx-auto w-full max-w-[1920px]">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="w-9 h-9 p-1.5 text-white pointer-events-auto rounded-full bg-general-60"
+            >
+              <path d="m16 16 2 2 4-4" />
+              <path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14" />
+              <polyline points="3.29 7 12 12 20.71 7" />
+              <line x1="12" x2="12" y1="22" y2="12" />
+            </svg>
+          </div>
+          <div className="ml-auto lg:mr-auto flex items-start justify-end gap-1 w-81 pointer-events-auto">
             {targetValues.map((item, i) => (
               <div key={i}>
                 <Textfield
