@@ -25,7 +25,7 @@ export default function SceneView() {
   return (
     <>
       {stage !== "START" && (
-        <div className="fixed flex items-start pt-1 md:pt-3.5 px-2 md:px-8 justify-center z-10 w-full pointer-events-none">
+        <div className="fixed flex items-start pt-3.5 px-2 md:px-8 justify-center z-10 w-full pointer-events-none">
           <div className="flex gap-5 items-center mx-auto w-full max-w-[1920px]">
             <svg
               xmlns="http://www.w3.org/2000/svg"
