@@ -14,9 +14,9 @@ const redhatMono = Red_Hat_Mono({
   subsets: ["latin"],
 });
 
-const APP_NAME = "Dice Demo";
-const APP_DEFAULT_TITLE = "Dice Demo";
-const APP_TITLE_TEMPLATE = "%s - Dice Demo";
+const APP_NAME = "Target Dice Demo";
+const APP_DEFAULT_TITLE = "Target Dice Demo";
+const APP_TITLE_TEMPLATE = "%s - Target Dice Demo";
 const APP_DESCRIPTION = "Dice roll simulation with pre-configurable outcomes.";
 
 export const metadata: Metadata = {
