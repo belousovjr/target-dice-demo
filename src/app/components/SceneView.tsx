@@ -60,7 +60,6 @@ export default function SceneView() {
                   className="text-center w-9 px-0"
                   disabled={stage !== "CONFIG"}
                   size="sm"
-                  autoFocus
                   onFocus={(e) => e.target.select()}
                   inputMode="decimal"
                 />
