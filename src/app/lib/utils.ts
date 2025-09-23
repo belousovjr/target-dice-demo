@@ -75,7 +75,6 @@ export async function loadAssets(
   canvas: HTMLCanvasElement
 ): Promise<SceneAssets> {
   const loader = new THREE.TextureLoader();
-
   const [albedo, ao, normal, ...dice] = await Promise.all([
     ...[
       "/polystyrene/rough-polystyrene_albedo.png",
@@ -135,6 +134,7 @@ export async function loadAssets(
   const renderer = new THREE.WebGLRenderer({
     canvas,
     antialias: true,
+    powerPreference: "high-performance",
     alpha: true,
   });
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -267,7 +267,7 @@ export function createScene(
   renderer.setSize(w, h, false);
 
   if (!oldSceneData) {
-    camera.position.set(0, cubeSize * 15, cubeSize * 7.7);
+    camera.position.set(0, cubeSize * 12, cubeSize * 7.7);
   }
 
   oldSceneData?.controls.dispose();
@@ -299,7 +299,7 @@ export function createScene(
     z: -cubeSize * 4,
   });
   light.castShadow = true;
-  light.shadow.blurSamples = 20;
+
   Object.assign(light.shadow.camera, {
     left: -traySizes.x,
     right: traySizes.x,
@@ -315,7 +315,7 @@ export function createScene(
 export function moveBodyTowards(
   posV: Vector3,
   targetV: Vector3,
-  step = 0.1,
+  step = 0.05,
   minDelta = 0.01
 ): { vector: Vector3; isDone: boolean } {
   const pos = new CANNON.Vec3(...posV);
@@ -378,7 +378,9 @@ export function getRandomVector3() {
 
 export function genRollReadyState(): RollReadyState {
   const v: Vector3 = getRandomVector3();
-  const angleVelocity = v.map((item) => item * 8) as Vector3;
+  const angleVelocity = v.map(
+    (item) => 4 * Math.sign(item) + item * 2
+  ) as Vector3;
   const velocity = v.map(
     (item) => item * 0.4 + Math.sign(item) * 0.2
   ) as Vector3;
