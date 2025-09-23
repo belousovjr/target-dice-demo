@@ -198,8 +198,6 @@ export function createCube(position: Vector3, assets?: SceneAssets) {
   let mesh: THREE.Mesh | undefined;
 
   if (assets) {
-    const cubeGeo = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
-    cubeGeo.computeVertexNormals();
     const mesh = assets.dice.clone();
 
     const cubeData = { body, mesh };
