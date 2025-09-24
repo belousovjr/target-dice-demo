@@ -7,6 +7,8 @@ import { Button, Loader, Textfield } from "@belousovjr/uikit";
 import { PlusIcon, PlayIcon, RotateCcwIcon, XIcon } from "lucide-react";
 import useServiceContext from "../lib/helpers/useServiceContext";
 import Snackbar from "./Snackbar";
+import TutorialTip from "./TutorialTip";
+import useTutorial from "../lib/helpers/useTutorial";
 
 export default function SceneView() {
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -15,12 +17,16 @@ export default function SceneView() {
     useSceneProvider(canvas);
 
   const { setNotification } = useServiceContext();
+  const { checkStatus, lastActiveStatus } = useTutorial();
 
   useEffect(() => {
     if (stage === "FINAL") {
       resetRef.current?.focus();
+      checkStatus("RESET");
+    } else if (stage === "CONFIG") {
+      checkStatus("CONFIG");
     }
-  }, [stage]);
+  }, [checkStatus, stage]);
 
   return (
     <>
@@ -45,75 +51,104 @@ export default function SceneView() {
           </svg>
           {stage !== "START" && (
             <div className="flex items-start justify-end gap-0.5 md:gap-1">
-              {targetValues.map((item, i) => (
-                <div key={i}>
-                  <Textfield
-                    value={item}
-                    key={`input-${i}`}
-                    onChange={(e) => {
-                      (e.target as HTMLInputElement).select();
-
-                      (e.target as HTMLInputElement).setSelectionRange(0, 1);
+              <TutorialTip status="CONFIG">
+                <div className="flex items-start gap-0.5 md:gap-1">
+                  {targetValues.map((item, i) => (
+                    <div key={i}>
+                      <Textfield
+                        value={item}
+                        key={`input-${i}`}
+                        onChange={(e) => {
+                          (e.target as HTMLInputElement).setSelectionRange(
+                            0,
+                            1
+                          );
+                        }}
+                        onKeyDown={(e) => {
+                          if (
+                            e.key.length === 1 &&
+                            !e.ctrlKey &&
+                            !e.shiftKey &&
+                            !e.altKey
+                          ) {
+                            const value = Number(e.key) as FaceIndex;
+                            if (!isNaN(value) && value > 0 && value <= 6) {
+                              const newTargetValues = [...targetValues];
+                              newTargetValues[i] = value;
+                              setTargetValues(newTargetValues);
+                              checkStatus("ROLL");
+                            } else {
+                              setNotification?.({
+                                text: "Only numbers from 1 to 6 are allowed",
+                                variant: "alert",
+                              });
+                            }
+                          }
+                        }}
+                        className="text-center w-9 px-0"
+                        disabled={stage !== "CONFIG"}
+                        size="sm"
+                        onFocus={(e) => e.target.select()}
+                        inputMode="decimal"
+                      />
+                      {stage === "CONFIG" && targetValues.length > 1 && (
+                        <Button
+                          onClick={() => {
+                            const newTargetValues = [...targetValues];
+                            newTargetValues.splice(i, 1);
+                            setTargetValues(newTargetValues);
+                            checkStatus("ROLL");
+                          }}
+                          icon={<XIcon />}
+                          variant="destructiveSecondary"
+                          size="sm"
+                          className="bg-transparent"
+                        />
+                      )}
+                    </div>
+                  ))}
+                  <Button
+                    onClick={() => {
+                      setTargetValues([...targetValues, 1]);
+                      checkStatus("ROLL");
                     }}
-                    onKeyDown={(e) => {
-                      if (
-                        e.key.length === 1 &&
-                        !e.ctrlKey &&
-                        !e.shiftKey &&
-                        !e.altKey
-                      ) {
-                        const value = Number(e.key) as FaceIndex;
-                        if (!isNaN(value) && value > 0 && value <= 6) {
-                          const newTargetValues = [...targetValues];
-                          newTargetValues[i] = value;
-                          setTargetValues(newTargetValues);
-                        } else {
-                          setNotification?.({
-                            text: "Only numbers from 1 to 6 are allowed",
-                            variant: "alert",
-                          });
-                        }
-                      }
-                    }}
-                    className="text-center w-9 px-0"
-                    disabled={stage !== "CONFIG"}
+                    icon={<PlusIcon />}
                     size="sm"
-                    onFocus={(e) => e.target.select()}
-                    inputMode="decimal"
+                    disabled={stage !== "CONFIG" || targetValues.length >= 6}
+                    variant="secondary"
                   />
-                  {stage === "CONFIG" && targetValues.length > 1 && (
-                    <Button
-                      onClick={() => {
-                        const newTargetValues = [...targetValues];
-                        newTargetValues.splice(i, 1);
-                        setTargetValues(newTargetValues);
-                      }}
-                      icon={<XIcon />}
-                      variant="destructiveSecondary"
-                      size="sm"
-                      className="bg-transparent"
-                    />
-                  )}
                 </div>
-              ))}
-              <Button
-                onClick={() => {
-                  setTargetValues([...targetValues, 1]);
-                }}
-                icon={<PlusIcon />}
-                size="sm"
-                disabled={stage !== "CONFIG" || targetValues.length >= 6}
-                variant="secondary"
-              />
+              </TutorialTip>
               {stage === "CONFIG" ? (
-                <Button onClick={start} icon={<PlayIcon />} size="sm" />
+                <TutorialTip
+                  status="ROLL"
+                  disabled={lastActiveStatus !== "ROLL"}
+                  hidden={lastActiveStatus === "FINAL"}
+                >
+                  <Button
+                    onClick={() => {
+                      start();
+                    }}
+                    icon={<PlayIcon />}
+                    size="sm"
+                  />
+                </TutorialTip>
               ) : (
-                <Button
-                  ref={resetRef}
-                  onClick={reset}
-                  icon={<RotateCcwIcon />}
-                  size="sm"
-                />
+                <TutorialTip
+                  status="RESET"
+                  disabled={!(lastActiveStatus === "RESET")}
+                  hidden={stage !== "FINAL"}
+                >
+                  <Button
+                    ref={resetRef}
+                    onClick={() => {
+                      reset();
+                      checkStatus("FINAL");
+                    }}
+                    icon={<RotateCcwIcon />}
+                    size="sm"
+                  />
+                </TutorialTip>
               )}
             </div>
           )}

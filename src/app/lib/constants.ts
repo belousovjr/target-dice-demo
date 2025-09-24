@@ -76,3 +76,5 @@ export const boxShape = new CANNON.Box(
 );
 
 export const trayGeo = genTrayGeometric();
+
+export const tutorialStatuses = ["CONFIG", "ROLL", "RESET", "FINAL"] as const;
