@@ -35,7 +35,12 @@ export default function TutorialTip({
           </span>
         );
       case "RESET":
-        return "Restart simulation.";
+        return (
+          <span>
+            <span className="font-bold">Success!</span> Now restart{" "}
+            <span className="font-bold">Simulation</span>.
+          </span>
+        );
       case "FINAL":
         return null;
       default:
