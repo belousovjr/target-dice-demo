@@ -42,7 +42,7 @@ export default function SceneView() {
             strokeWidth="1.5"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="w-9 h-9 p-1.5 text-white rounded-full bg-general-60 shrink-0 grow-0"
+            className="w-9 h-9 p-1.5 bg-general-60 rounded-full text-white shrink-0 grow-0"
           >
             <path d="m16 16 2 2 4-4" />
             <path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14" />
