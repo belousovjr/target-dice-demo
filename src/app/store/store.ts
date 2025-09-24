@@ -2,9 +2,11 @@ import { configureStore, combineReducers } from "@reduxjs/toolkit";
 import storage from "redux-persist/lib/storage";
 import { persistReducer, persistStore, WebStorage } from "redux-persist";
 import diceReducer from "./../store/slices/diceSlice";
+import tutorialReducer from "./slices/tutorialSlice";
 
 const reducers = {
   dice: diceReducer,
+  tutorial: tutorialReducer,
 } as const;
 
 const rootReducer = combineReducers(reducers);
@@ -16,7 +18,7 @@ const persistConfig: {
 } = {
   key: "root",
   storage,
-  whitelist: ["dice"],
+  whitelist: ["dice", "tutorial"],
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

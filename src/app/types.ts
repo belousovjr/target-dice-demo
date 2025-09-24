@@ -1,6 +1,6 @@
 import CANNON from "cannon";
 import * as THREE from "three";
-import { faceVectors } from "./lib/constants";
+import { faceVectors, tutorialStatuses } from "./lib/constants";
 import { OrbitControls } from "three/examples/jsm/Addons.js";
 import { ComponentProps } from "react";
 import { Notification } from "@belousovjr/uikit";
@@ -84,3 +84,7 @@ export interface SnackbarData {
   variant?: ComponentProps<typeof Notification>["variant"];
   timestamp: number;
 }
+
+export type TutorialStatusOption = (typeof tutorialStatuses)[number];
+
+export type TutorialStatusState = Record<TutorialStatusOption, boolean>;
