@@ -51,7 +51,7 @@ export default function SceneView() {
           </svg>
           {stage !== "START" && (
             <div className="flex items-start justify-end gap-0.5 md:gap-1">
-              <TutorialTip status="CONFIG">
+              <TutorialTip status="CONFIG" disabled={stage !== "CONFIG"}>
                 <div className="flex items-start gap-0.5 md:gap-1">
                   {targetValues.map((item, i) => (
                     <div key={i}>
