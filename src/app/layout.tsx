@@ -62,7 +62,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${interSans.variable} ${redhatMono.variable} antialiased`}
+        className={`${interSans.variable} ${redhatMono.variable} antialiased font-sans`}
       >
         <ReduxProvider>
           <ServiceContextProvider>{children}</ServiceContextProvider>

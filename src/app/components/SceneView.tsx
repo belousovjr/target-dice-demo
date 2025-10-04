@@ -58,12 +58,7 @@ export default function SceneView() {
                       <Textfield
                         value={item}
                         key={`input-${i}`}
-                        onChange={(e) => {
-                          (e.target as HTMLInputElement).setSelectionRange(
-                            0,
-                            1
-                          );
-                        }}
+                        onChange={() => {}}
                         onKeyDown={(e) => {
                           if (
                             e.key.length === 1 &&
