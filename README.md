@@ -28,6 +28,5 @@ You can **choose the number of dice and set the exact values that should appear*
 
 ## Links
 
-- [dice-demo-ivory.vercel.app](https://dice-demo-ivory.vercel.app/)
 - [uikit](https://uikit-peach.vercel.app)
 - [GitHub](https://github.com/belousovjr/target-dice-demo)
