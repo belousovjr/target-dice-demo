@@ -75,10 +75,9 @@ export async function loadAssets(
   canvas: HTMLCanvasElement
 ): Promise<SceneAssets> {
   const loader = new THREE.TextureLoader();
-  const [albedo, ao, normal, ...dice] = await Promise.all([
+  const [albedo, normal, ...dice] = await Promise.all([
     ...[
       "/polystyrene/rough-polystyrene_albedo.png",
-      "/polystyrene/rough-polystyrene_ao.png",
       "/polystyrene/rough-polystyrene_normal-ogl.png",
       ...createDiceTextures(
         { size: 100, color: "white", pipColor: "black" },
@@ -101,7 +100,6 @@ export async function loadAssets(
   const trayRenderMat = new THREE.MeshStandardMaterial({
     color: 0x1e5eff,
     map: albedo,
-    aoMap: ao,
     normalMap: normal,
   });
 
@@ -141,7 +139,7 @@ export async function loadAssets(
   renderer.shadowMap.enabled = true;
 
   await processInChunks(
-    [albedo, ao, normal, ...dice],
+    [albedo, normal, ...dice],
     (texture) => {
       renderer.initTexture(texture);
     },
